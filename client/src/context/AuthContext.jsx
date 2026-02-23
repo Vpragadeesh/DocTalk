@@ -30,7 +30,16 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      // Call backend to cleanup session (delete FAISS, docs, etc.)
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout cleanup error:', error);
+      // Continue with local logout even if backend fails
+    }
+    
+    // Clear local storage and state
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);

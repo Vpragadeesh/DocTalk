@@ -1,6 +1,6 @@
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_classic.chains.retrieval_qa.base import RetrievalQA
+from langchain_classic.chains import RetrievalQA
 from langchain_core.prompts import PromptTemplate
 from langchain_core.callbacks import BaseCallbackHandler
 from rag.retriever import get_retriever
@@ -37,13 +37,21 @@ def get_streaming_rag_chain(user_id: str):
     prompt = PromptTemplate(
         input_variables=["context", "question"],
         template="""
-Answer using ONLY the context.
+Answer using ONLY the context. The context may come from MULTIPLE documents — cover ALL of them.
+
+FORMAT your response using markdown:
+- Use ## headers for sections
+- Use **bold** for key terms
+- Use bullet points for lists
+- Use markdown tables for numerical/metric data
 
 Context:
 {context}
 
 Question:
 {question}
+
+Answer (well-formatted markdown):
 """
     )
 
@@ -72,13 +80,21 @@ def stream_rag_response(user_id: str, question: str):
     prompt = PromptTemplate(
         input_variables=["context", "question"],
         template="""
-Answer using ONLY the context.
+Answer using ONLY the context. The context may come from MULTIPLE documents — cover ALL of them.
+
+FORMAT your response using markdown:
+- Use ## headers for sections
+- Use **bold** for key terms
+- Use bullet points for lists
+- Use markdown tables for numerical/metric data
 
 Context:
 {context}
 
 Question:
 {question}
+
+Answer (well-formatted markdown):
 """
     )
 

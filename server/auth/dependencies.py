@@ -4,7 +4,9 @@ from auth.jwt_handler import decode_access_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
+
 def get_current_user_id(token: str = Depends(oauth2_scheme)):
+    """Get current user ID from token."""
     payload = decode_access_token(token)
     if payload is None:
         raise HTTPException(
@@ -12,3 +14,14 @@ def get_current_user_id(token: str = Depends(oauth2_scheme)):
             detail="Invalid or expired token"
         )
     return payload.get("user_id")
+
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    """Get current user payload from token."""
+    payload = decode_access_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token"
+        )
+    return payload

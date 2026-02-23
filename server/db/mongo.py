@@ -29,6 +29,7 @@ users_col = db["users"]
 documents_col = db["documents"]
 chunks_col = db["chunks"]
 chat_history_col = db["chat_history"]
+faiss_metadata_col = db["faiss_metadata"]  # For FAISS index metadata
 
 
 # Database & Index Initialization

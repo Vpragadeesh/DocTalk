@@ -50,6 +50,10 @@ def query_documents(
             "chat_history": chat_history
         })
     except Exception as e:
+        import logging
+        import traceback
+        logging.error(f"Chain error: {e}")
+        logging.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
     answer = response["answer"]

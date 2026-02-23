@@ -20,8 +20,15 @@ def get_rag_chain(user_id: str):
     prompt = PromptTemplate(
         input_variables=["context", "question"],
         template="""
-You are an AI assistant.
-Answer ONLY using the provided context.
+You are an AI assistant. Answer ONLY using the provided context. The context may come from MULTIPLE documents — cover information from ALL of them.
+
+If the answer is not in the context, say: "Answer not found in uploaded documents."
+
+FORMAT your response using markdown:
+- Use ## headers for sections
+- Use **bold** for key terms
+- Use bullet points for lists
+- Use markdown tables for numerical/metric data
 
 Context:
 {context}
@@ -29,8 +36,7 @@ Context:
 Question:
 {question}
 
-If the answer is not in the context, say:
-"Answer not found in uploaded documents."
+Answer (well-formatted markdown):
 """
     )
 

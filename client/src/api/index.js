@@ -22,6 +22,7 @@ api.interceptors.request.use((config) => {
 export const authAPI = {
   register: (email, password) => api.post('/auth/register', { email, password }),
   login: (email, password) => api.post('/auth/login', { email, password }),
+  logout: () => api.post('/auth/logout'),  // New: calls backend to cleanup session
 };
 
 // Documents APIs

@@ -1,25 +1,81 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_classic.chains.conversational_retrieval.base import ConversationalRetrievalChain
+from langchain_classic.chains import ConversationalRetrievalChain
+from langchain_core.prompts import PromptTemplate
 from rag.retriever import get_retriever
 import os
 from dotenv import load_dotenv
+import logging
+
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 MODEL = os.getenv("GEMINI_MODEL", "gemini-pro")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
+# Custom prompt to rephrase questions for better document retrieval
+CONDENSE_QUESTION_PROMPT = PromptTemplate.from_template("""
+Given the following conversation and a follow up question, rephrase the follow up question 
+to be a standalone question that includes specific keywords for document search.
+
+If the user asks about "myself", "me", "my background", "my resume", "my profile", etc., 
+rephrase it to search for personal information, resume, skills, education, experience, projects, 
+name, profile, background in the uploaded documents.
+
+Chat History:
+{chat_history}
+
+Follow Up Input: {question}
+
+Standalone question with search keywords:""")
+
+# Custom QA prompt to answer from documents
+QA_PROMPT = PromptTemplate.from_template("""
+You are an AI assistant that answers questions based ONLY on the provided context from uploaded documents.
+
+IMPORTANT RULES:
+1. Answer ONLY using information from the context below.
+2. If the user asks about "myself" or "me", look for resume, profile, or personal information in the context.
+3. If the information is not in the context, say "I couldn't find this information in your uploaded documents."
+4. Search across ALL provided context chunks — they may come from DIFFERENT documents. Cover information from EVERY document, not just one.
+5. Be specific and cite which document the information comes from when possible.
+
+FORMATTING RULES (very important):
+- Use **markdown** formatting in your response.
+- Use `##` headers to organize different topics or models.
+- Use **bold** for key terms, model names, and important values.
+- Use bullet points (`-`) for listing features, characteristics, or details.
+- When presenting numerical data or performance metrics, use a **markdown table** with clear column headers.
+- Keep the response well-structured and easy to scan.
+
+Context from uploaded documents:
+{context}
+
+Question: {question}
+
+Answer (comprehensive, well-formatted markdown covering ALL documents):""")
+
+
 def get_conversational_rag_chain(user_id: str):
+    """
+    Create a conversational RAG chain that searches across ALL user documents.
+    Uses custom prompts to better handle personal queries like "tell me about myself".
+    """
     llm = ChatGoogleGenerativeAI(
         model=MODEL,
         temperature=0,
         google_api_key=GOOGLE_API_KEY
     )
 
-    retriever = get_retriever(user_id)
+    # Get retriever with k=8 to search across more documents
+    retriever = get_retriever(user_id, k=8)
+    
+    logger.info(f"Creating conversational chain for user: {user_id}")
 
     return ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
+        condense_question_prompt=CONDENSE_QUESTION_PROMPT,
+        combine_docs_chain_kwargs={"prompt": QA_PROMPT},
         return_source_documents=True,
         verbose=True
     )
