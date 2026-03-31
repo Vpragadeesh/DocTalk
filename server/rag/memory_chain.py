@@ -28,8 +28,8 @@ Follow Up Input: {question}
 
 Standalone question with search keywords:""")
 
-# Custom QA prompt to answer from documents
-QA_PROMPT = PromptTemplate.from_template("""
+# Custom QA prompt to answer from documents (without web context)
+QA_PROMPT_DOCS_ONLY = PromptTemplate.from_template("""
 You are an AI assistant that answers questions based ONLY on the provided context from uploaded documents.
 
 IMPORTANT RULES:
@@ -54,11 +54,44 @@ Question: {question}
 
 Answer (comprehensive, well-formatted markdown covering ALL documents):""")
 
+# Custom QA prompt with web context
+QA_PROMPT_WITH_WEB = """
+You are an AI assistant that answers questions using BOTH uploaded documents AND web search results.
 
-def get_conversational_rag_chain(user_id: str):
+IMPORTANT RULES:
+1. Use information from BOTH the uploaded documents AND web search results.
+2. Prioritize uploaded documents for personal/specific information.
+3. Use web results to supplement with current/general information.
+4. ALWAYS cite your sources - indicate whether information comes from "[Document: filename]" or "[Web: url]".
+5. If information conflicts between sources, mention both perspectives.
+
+FORMATTING RULES:
+- Use **markdown** formatting in your response.
+- Use `##` headers to organize different topics.
+- Use **bold** for key terms and important values.
+- Use bullet points for lists.
+- When presenting data, use markdown tables.
+- Clearly distinguish between document-based and web-based information.
+
+=== UPLOADED DOCUMENTS ===
+{context}
+
+=== WEB SEARCH RESULTS ===
+{web_context}
+
+Question: {question}
+
+Answer (comprehensive, citing sources from both documents and web):"""
+
+
+def get_conversational_rag_chain(user_id: str, web_context: str = ""):
     """
     Create a conversational RAG chain that searches across ALL user documents.
     Uses custom prompts to better handle personal queries like "tell me about myself".
+    
+    Args:
+        user_id: User identifier
+        web_context: Optional web search context to include
     """
     llm = ChatGroq(
         model=MODEL,
@@ -69,13 +102,22 @@ def get_conversational_rag_chain(user_id: str):
     # Get retriever with k=8 to search across more documents
     retriever = get_retriever(user_id, k=8)
     
-    logger.info(f"Creating conversational chain for user: {user_id}")
+    # Choose prompt based on whether web context is provided
+    if web_context:
+        # Create a dynamic prompt with web context
+        qa_prompt = PromptTemplate.from_template(
+            QA_PROMPT_WITH_WEB.replace("{web_context}", web_context)
+        )
+        logger.info(f"Creating conversational chain for user: {user_id} WITH web context")
+    else:
+        qa_prompt = QA_PROMPT_DOCS_ONLY
+        logger.info(f"Creating conversational chain for user: {user_id} (documents only)")
 
     return ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
         condense_question_prompt=CONDENSE_QUESTION_PROMPT,
-        combine_docs_chain_kwargs={"prompt": QA_PROMPT},
+        combine_docs_chain_kwargs={"prompt": qa_prompt},
         return_source_documents=True,
         verbose=True
     )

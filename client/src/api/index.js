@@ -49,11 +49,12 @@ export const documentsAPI = {
 
 // Query APIs
 export const queryAPI = {
-  query: (question, filters = null, conversationId = null) => 
+  query: (question, filters = null, conversationId = null, searchContext = null) => 
     api.post('/query/', { 
       question, 
       filters, 
-      conversation_id: conversationId 
+      conversation_id: conversationId,
+      search_context: searchContext
     }),
   queryStream: async (question, onChunk, onComplete, onError) => {
     try {
@@ -100,6 +101,28 @@ export const queryAPI = {
       onError && onError(error);
     }
   },
+};
+
+// Search APIs (MCP + Web Search)
+export const searchAPI = {
+  hybridSearch: (query, options = {}) =>
+    api.post('/search/hybrid', { query, ...options }),
+  
+  webSearch: (query, numResults = 5) =>
+    api.post('/search/hybrid', { 
+      query, 
+      search_type: 'web_only', 
+      top_k_web: numResults 
+    }),
+  
+  getMCPStatus: () =>
+    api.get('/search/mcp/health'),
+  
+  getCachedResults: (query, limit = 10) =>
+    api.get(`/search/cache?query=${encodeURIComponent(query)}&limit=${limit}`),
+  
+  clearSearchCache: (queryHash) =>
+    api.delete(`/search/cache/${queryHash}`),
 };
 
 // Chat History APIs

@@ -1,24 +1,42 @@
-# filepath: /home/susan/Desktop/DocTalk/server/requirements.txt
+# DocTalk Server Requirements
+
+# FastAPI & Server
 fastapi
-uvicorn
+uvicorn[standard]
+python-multipart
+pydantic>=2.0
+
+# LangChain ecosystem
 langchain
 langchain-classic
 langchain-core
 langchain-community
 langchain-text-splitters
-python-multipart
-faiss-cpu
-pymongo
-python-dotenv
+langchain-huggingface
+langchain-groq
 langchain-google-genai
-certifi
-pydantic>=2.0
+
+# Database
+pymongo
+faiss-cpu
+
+# Authentication
 python-jose[cryptography]
 passlib[bcrypt]
 bcrypt==4.0.1
+
+# Document Processing
 pypdf
 docx2txt
-langchain-huggingface
+
+# MCP/Web Search
+httpx
+beautifulsoup4
+lxml
+
+# Utilities
+python-dotenv
+certifi
 
 # CPU-only PyTorch (no NVIDIA CUDA)
 --extra-index-url https://download.pytorch.org/whl/cpu

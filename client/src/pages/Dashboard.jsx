@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { documentsAPI, queryAPI, chatAPI } from "../api";
+import { documentsAPI, queryAPI, chatAPI, searchAPI } from "../api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import FilterPanel from "../components/FilterPanel";
 import ChatHistory from "../components/ChatHistory";
 import SourceViewer from "../components/SourceViewer";
+import SearchMode, { SearchModeIndicator } from "../components/SearchMode";
 import {
   LogOut,
   Send,
@@ -22,6 +23,7 @@ import {
   Plus,
   Filter as FilterIcon,
   FolderOpen,
+  Globe,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -33,6 +35,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeFilters, setActiveFilters] = useState(null);
+  const [searchMode, setSearchMode] = useState('docs_only'); // docs_only, hybrid, web_only
   
   // Chat history state
   const [currentConversationId, setCurrentConversationId] = useState(null);
@@ -108,8 +111,15 @@ export default function Dashboard() {
     setError("");
     
     try {
-      const response = await queryAPI.query(currentQuestion, activeFilters, currentConversationId);
-      const { answer, sources, conversation_id, is_new_conversation } = response.data;
+      // Prepare search context based on search mode
+      const searchContext = searchMode !== 'docs_only' ? {
+        enable_web_search: true,
+        search_type: searchMode,
+        max_web_results: 5
+      } : null;
+      
+      const response = await queryAPI.query(currentQuestion, activeFilters, currentConversationId, searchContext);
+      const { answer, sources, conversation_id, is_new_conversation, web_search_used } = response.data;
       
       if (is_new_conversation) {
         setCurrentConversationId(conversation_id);
@@ -122,7 +132,8 @@ export default function Dashboard() {
           role: "assistant", 
           content: answer || "No response received.", 
           sources: sources || [],
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          webSearchUsed: web_search_used || false
         },
       ]);
     } catch (err) {
@@ -317,16 +328,21 @@ export default function Dashboard() {
                           )}
                         </div>
 
-                        {/* Sources */}
+                        {/* Sources with web indicator */}
                         {message.sources && message.sources.length > 0 && (
                           <button 
                             onClick={() => openSourceViewer(message.sources)} 
                             className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] transition-colors hover:bg-gray-800/50"
                             style={{ color: '#64748b', border: '1px solid rgba(99,102,241,0.1)' }}
                           >
-                            <FileText className="h-3 w-3" style={{ color: '#6366f1' }} />
+                            {message.webSearchUsed ? (
+                              <Globe className="h-3 w-3" style={{ color: '#22d3ee' }} />
+                            ) : (
+                              <FileText className="h-3 w-3" style={{ color: '#6366f1' }} />
+                            )}
                             <span>
                               {message.sources.length} source{message.sources.length > 1 ? 's' : ''}
+                              {message.webSearchUsed && ' (incl. web)'}
                             </span>
                             <ChevronDown className="h-3 w-3" />
                           </button>
@@ -381,6 +397,11 @@ export default function Dashboard() {
                   documents={documents} 
                   onFiltersChange={handleFiltersChange}
                   activeFilters={activeFilters}
+                />
+                <SearchMode 
+                  searchMode={searchMode}
+                  onModeChange={setSearchMode}
+                  disabled={loading}
                 />
                 {activeFilters && (
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4', border: '1px solid rgba(6, 182, 212, 0.2)' }}>

@@ -4,12 +4,16 @@ from typing import Dict, Optional, List
 from pydantic import BaseModel
 import uuid
 import time
+import asyncio
+import logging
 
 from rag.memory_chain import get_conversational_rag_chain
 from rag.streaming_chain import get_streaming_rag_chain, stream_rag_response
 from db.mongo import save_chat, get_chat_history
 from auth.dependencies import get_current_user_id
 from storage.chat_storage import chat_storage
+
+logger = logging.getLogger(__name__)
 
 # -------------------------------------------------
 # Router
@@ -22,27 +26,36 @@ class QueryFilters(BaseModel):
     date_from: Optional[str] = None
     date_to: Optional[str] = None
 
+class SearchContext(BaseModel):
+    """Web search context options."""
+    enable_web_search: bool = False
+    search_type: str = "hybrid"  # hybrid, web_only
+    max_web_results: int = 5
+
 class QueryRequest(BaseModel):
     question: str
     filters: Optional[QueryFilters] = None
     conversation_id: Optional[str] = None
+    search_context: Optional[SearchContext] = None
 
 # -------------------------------------------------
-# NORMAL QUERY (WITH MEMORY)
+# NORMAL QUERY (WITH MEMORY AND OPTIONAL WEB SEARCH)
 # -------------------------------------------------
 @router.post("/")
-def query_documents(
+async def query_documents(
     request: QueryRequest,
     user_id: str = Depends(get_current_user_id)
 ):
     """
-    Stateless conversational RAG query.
+    Stateless conversational RAG query with optional web search.
     Conversation history is passed explicitly.
     """
     question = request.question
     conversation_id = request.conversation_id
+    search_context = request.search_context
     is_new_conversation = False
     start_time = time.time()
+    web_sources = []
 
     # Create new conversation if not provided
     if not conversation_id:
@@ -60,8 +73,38 @@ def query_documents(
         conversation_title=question[:50] if is_new_conversation else None
     )
 
+    # Check if web search is enabled
+    web_context = ""
+    if search_context and search_context.enable_web_search:
+        try:
+            from mcp.mcp_client import get_mcp_client, format_web_results_for_context
+            
+            mcp_client = get_mcp_client()
+            web_data = await mcp_client.search_and_extract(
+                query=question,
+                num_results=search_context.max_web_results
+            )
+            
+            web_results = web_data.get("results", [])
+            if web_results:
+                web_context = await format_web_results_for_context(web_results)
+                
+                # Build web sources for response
+                for result in web_results:
+                    web_sources.append({
+                        "source": "web",
+                        "title": result.get("title"),
+                        "url": result.get("url"),
+                        "snippet": result.get("snippet", "")[:200]
+                    })
+                
+                logger.info(f"Added {len(web_results)} web results to context")
+        except Exception as e:
+            logger.error(f"Web search failed: {e}")
+            # Continue without web results
+
     # 1️⃣ Build stateless chain (NO MEMORY INSIDE)
-    chain = get_conversational_rag_chain(user_id)
+    chain = get_conversational_rag_chain(user_id, web_context=web_context)
 
     # 2️⃣ Fetch previous chat history from MongoDB
     previous_chats = get_chat_history(user_id, limit=6)
@@ -79,10 +122,9 @@ def query_documents(
             "chat_history": chat_history
         })
     except Exception as e:
-        import logging
+        logger.error(f"Chain error: {e}")
         import traceback
-        logging.error(f"Chain error: {e}")
-        logging.error(traceback.format_exc())
+        logger.error(traceback.format_exc())
         
         # Save error message
         chat_storage.save_message(
@@ -100,10 +142,11 @@ def query_documents(
     answer = response["answer"]
     response_time = int((time.time() - start_time) * 1000)
 
-    # Build sources with full text
+    # Build sources with full text (document sources)
     sources = []
     for doc in response.get("source_documents", []):
         sources.append({
+            "source": "document",
             "filename": doc.metadata.get("filename"),
             "page": doc.metadata.get("page"),
             "full_text": doc.page_content[:500] if doc.page_content else None,
@@ -111,18 +154,24 @@ def query_documents(
             "chunk_index": doc.metadata.get("chunk_index")
         })
 
+    # Combine document and web sources
+    all_sources = sources + web_sources
+
     # Save assistant message with sources
     chat_storage.save_message(
         user_id=user_id,
         conversation_id=conversation_id,
         message_type="assistant",
         content=answer,
-        sources=sources,
+        sources=all_sources,
         response_metadata={
             "model": "llama-3.3-70b-versatile",
             "response_time_ms": response_time,
             "status": "success",
-            "source_count": len(sources)
+            "source_count": len(all_sources),
+            "doc_sources": len(sources),
+            "web_sources": len(web_sources),
+            "web_search_enabled": bool(search_context and search_context.enable_web_search)
         }
     )
 
@@ -131,14 +180,15 @@ def query_documents(
         user_id=user_id,
         question=question,
         answer=answer,
-        sources=sources
+        sources=all_sources
     )
 
     return {
         "answer": answer,
-        "sources": sources,
+        "sources": all_sources,
         "conversation_id": conversation_id,
-        "is_new_conversation": is_new_conversation
+        "is_new_conversation": is_new_conversation,
+        "web_search_used": len(web_sources) > 0
     }
 
 # -------------------------------------------------
@@ -159,5 +209,5 @@ def query_documents_stream(
 
 
 # This file provides two endpoints:
-# POST /query → normal RAG with memory
+# POST /query → normal RAG with memory and optional web search
 # POST /query/stream → streaming response (Gemini)
