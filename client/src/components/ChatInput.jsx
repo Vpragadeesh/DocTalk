@@ -1,7 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import './ChatInput.css';
+import { SearchModeDropdown } from './SearchMode';
 
-const ChatInput = ({ onSend, disabled }) => {
+const ChatInput = ({ 
+  onSend, 
+  disabled, 
+  searchMode = 'docs_only',
+  onSearchModeChange = () => {}
+}) => {
   const [message, setMessage] = useState('');
   const [files, setFiles] = useState([]);
   const textareaRef = useRef(null);
@@ -47,21 +52,21 @@ const ChatInput = ({ onSend, disabled }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="chat-input-form">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
       {files.length > 0 && (
-        <div className="selected-files">
+        <div className="flex flex-wrap gap-2 rounded-lg bg-[var(--bg-tertiary)] p-2">
           {files.map((file, index) => (
-            <div key={index} className="file-tag">
+            <div key={index} className="flex items-center gap-1 rounded-md border border-[var(--border-light)] bg-[var(--bg-secondary)] px-2 py-1 text-sm text-[var(--text-secondary)]">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" 
                   stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M13 2v7h7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <span className="file-name">{file.name}</span>
+              <span className="max-w-[200px] truncate">{file.name}</span>
               <button
                 type="button"
                 onClick={() => removeFile(index)}
-                className="remove-file"
+                className="flex h-5 w-5 items-center justify-center rounded-sm text-[var(--text-tertiary)] transition-colors duration-200 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                 aria-label="Remove file"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
@@ -73,11 +78,17 @@ const ChatInput = ({ onSend, disabled }) => {
         </div>
       )}
 
-      <div className="input-container">
+      <div className="flex items-end gap-2 rounded-xl border-2 border-[var(--border-light)] bg-[var(--bg-secondary)] p-4 transition-colors duration-200 focus-within:border-[var(--accent-primary)]">
+        <SearchModeDropdown 
+          searchMode={searchMode}
+          onModeChange={onSearchModeChange}
+          disabled={disabled}
+        />
+        
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="attach-button"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-transparent text-[var(--text-secondary)] transition-colors duration-200 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
           disabled={disabled}
           aria-label="Attach file"
         >
@@ -93,7 +104,7 @@ const ChatInput = ({ onSend, disabled }) => {
           multiple
           accept=".pdf,.docx,.txt"
           onChange={handleFileSelect}
-          style={{ display: 'none' }}
+          className="hidden"
         />
 
         <textarea
@@ -102,14 +113,14 @@ const ChatInput = ({ onSend, disabled }) => {
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask about your documents..."
-          className="message-input"
+          className="custom-scrollbar max-h-[200px] flex-1 resize-none overflow-y-auto border-none bg-transparent text-base leading-6 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-placeholder)] disabled:cursor-not-allowed disabled:opacity-60"
           disabled={disabled}
           rows={1}
         />
 
         <button
           type="submit"
-          className="send-button"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-transparent text-[var(--text-secondary)] transition-colors duration-200 hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50 enabled:bg-[var(--accent-primary)] enabled:text-white enabled:hover:bg-[var(--accent-hover)]"
           disabled={disabled || (!message.trim() && files.length === 0)}
           aria-label="Send message"
         >
@@ -120,7 +131,7 @@ const ChatInput = ({ onSend, disabled }) => {
         </button>
       </div>
 
-      <div className="input-hint">
+      <div className="px-2 text-center text-xs text-[var(--text-tertiary)]">
         <span>Press Enter to send, Shift+Enter for new line</span>
       </div>
     </form>
