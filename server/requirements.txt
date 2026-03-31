@@ -1,4 +1,5 @@
 # DocTalk Server Requirements
+# Use: uv pip install -r requirements.txt
 
 # FastAPI & Server
 fastapi
@@ -29,14 +30,20 @@ bcrypt==4.0.1
 pypdf
 docx2txt
 
-# MCP/Web Search
+# Web Search (lxml for fast HTML parsing)
 httpx
-beautifulsoup4
 lxml
+lxml-html-clean
+cssselect
+urllib3
 
 # Utilities
 python-dotenv
 certifi
+
+# MCP and async support
+pydantic
+typing-extensions
 
 # CPU-only PyTorch (no NVIDIA CUDA)
 --extra-index-url https://download.pytorch.org/whl/cpu

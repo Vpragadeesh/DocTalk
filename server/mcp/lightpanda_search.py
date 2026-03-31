@@ -1,8 +1,8 @@
 """
-Lightpanda Web Search Implementation
+Web Search Implementation
 
 Provides web search capabilities using multiple search engines.
-Uses httpx for async HTTP requests and BeautifulSoup for parsing search results.
+Uses httpx for async HTTP requests and lxml for fast HTML parsing.
 """
 
 import asyncio
@@ -10,11 +10,11 @@ import logging
 import hashlib
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
-from urllib.parse import quote_plus, urljoin
+from urllib.parse import quote_plus, urljoin, parse_qs, urlparse
 import re
 
 import httpx
-from bs4 import BeautifulSoup
+from lxml import html
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,8 @@ class LightpandaSearch:
     - DuckDuckGo (default, no API key required)
     - Google (requires scraping or API key)
     - Bing (requires scraping or API key)
+    
+    Uses lxml for fast HTML parsing.
     """
     
     def __init__(self, timeout: float = 10.0, max_retries: int = 3):
@@ -91,24 +93,28 @@ class LightpandaSearch:
                 response = await client.get(url, headers=self.headers)
                 response.raise_for_status()
                 
-                soup = BeautifulSoup(response.text, "html.parser")
+                # Parse with lxml
+                tree = html.fromstring(response.text)
                 
-                # Find search results
-                result_links = soup.find_all("a", class_="result__a")
-                result_snippets = soup.find_all("a", class_="result__snippet")
+                # Find search results using XPath
+                result_links = tree.xpath('//a[@class="result__a"]')
+                result_snippets = tree.xpath('//a[@class="result__snippet"]')
                 
-                for i, (link, snippet) in enumerate(zip(result_links, result_snippets)):
+                for i, link in enumerate(result_links):
                     if i >= num_results:
                         break
                     
-                    title = link.get_text(strip=True)
+                    title = link.text_content().strip()
                     href = link.get("href", "")
-                    snippet_text = snippet.get_text(strip=True) if snippet else ""
+                    
+                    # Get snippet if available
+                    snippet_text = ""
+                    if i < len(result_snippets):
+                        snippet_text = result_snippets[i].text_content().strip()
                     
                     # Extract actual URL from DuckDuckGo redirect
                     if "uddg=" in href:
-                        import urllib.parse
-                        parsed = urllib.parse.parse_qs(urllib.parse.urlparse(href).query)
+                        parsed = parse_qs(urlparse(href).query)
                         actual_url = parsed.get("uddg", [href])[0]
                     else:
                         actual_url = href
@@ -126,7 +132,6 @@ class LightpandaSearch:
                 
         except Exception as e:
             logger.error(f"DuckDuckGo search failed: {e}")
-            # Try fallback
             results = await self._search_fallback(query, num_results)
         
         return results
@@ -142,32 +147,33 @@ class LightpandaSearch:
                 response = await client.get(url, headers=self.headers)
                 response.raise_for_status()
                 
-                soup = BeautifulSoup(response.text, "html.parser")
+                # Parse with lxml
+                tree = html.fromstring(response.text)
                 
-                # Find search result divs
-                search_divs = soup.find_all("div", class_="g")
+                # Find search result divs using XPath
+                search_divs = tree.xpath('//div[@class="g"]')
                 
                 for i, div in enumerate(search_divs):
                     if i >= num_results:
                         break
                     
                     # Extract title and URL
-                    title_elem = div.find("h3")
-                    link_elem = div.find("a", href=True)
-                    snippet_elem = div.find("div", class_="VwiC3b")
+                    title_elems = div.xpath('.//h3')
+                    link_elems = div.xpath('.//a[@href]')
+                    snippet_elems = div.xpath('.//div[@class="VwiC3b"]')
                     
-                    if title_elem and link_elem:
-                        title = title_elem.get_text(strip=True)
-                        url = link_elem.get("href", "")
-                        snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    if title_elems and link_elems:
+                        title = title_elems[0].text_content().strip()
+                        result_url = link_elems[0].get("href", "")
+                        snippet = snippet_elems[0].text_content().strip() if snippet_elems else ""
                         
-                        if url.startswith("/url?q="):
-                            url = url.split("/url?q=")[1].split("&")[0]
+                        if result_url.startswith("/url?q="):
+                            result_url = result_url.split("/url?q=")[1].split("&")[0]
                         
-                        if title and url and url.startswith("http"):
+                        if title and result_url and result_url.startswith("http"):
                             results.append({
                                 "title": title,
-                                "url": url,
+                                "url": result_url,
                                 "snippet": snippet,
                                 "source": "google",
                                 "rank": i + 1
@@ -192,28 +198,29 @@ class LightpandaSearch:
                 response = await client.get(url, headers=self.headers)
                 response.raise_for_status()
                 
-                soup = BeautifulSoup(response.text, "html.parser")
+                # Parse with lxml
+                tree = html.fromstring(response.text)
                 
-                # Find Bing result elements
-                result_items = soup.find_all("li", class_="b_algo")
+                # Find Bing result elements using XPath
+                result_items = tree.xpath('//li[@class="b_algo"]')
                 
                 for i, item in enumerate(result_items):
                     if i >= num_results:
                         break
                     
-                    title_elem = item.find("h2")
-                    link_elem = item.find("a", href=True)
-                    snippet_elem = item.find("p")
+                    title_elems = item.xpath('.//h2')
+                    link_elems = item.xpath('.//a[@href]')
+                    snippet_elems = item.xpath('.//p')
                     
-                    if title_elem and link_elem:
-                        title = title_elem.get_text(strip=True)
-                        url = link_elem.get("href", "")
-                        snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
+                    if title_elems and link_elems:
+                        title = title_elems[0].text_content().strip()
+                        result_url = link_elems[0].get("href", "")
+                        snippet = snippet_elems[0].text_content().strip() if snippet_elems else ""
                         
-                        if title and url:
+                        if title and result_url:
                             results.append({
                                 "title": title,
-                                "url": url,
+                                "url": result_url,
                                 "snippet": snippet,
                                 "source": "bing",
                                 "rank": i + 1
@@ -229,8 +236,6 @@ class LightpandaSearch:
     
     async def _search_fallback(self, query: str, num_results: int) -> List[Dict]:
         """Fallback search using a simple web search API."""
-        # Use SearXNG or similar open search if available
-        # For now, return empty results with a message
         logger.warning("All search engines failed, returning empty results")
         return []
     

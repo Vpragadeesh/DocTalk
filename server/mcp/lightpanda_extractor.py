@@ -1,8 +1,9 @@
 """
-Lightpanda Content Extractor
+Content Extractor
 
 Extracts main content from web pages, filtering out navigation,
 ads, and other non-content elements. Preserves structure.
+Uses lxml for fast HTML parsing.
 """
 
 import asyncio
@@ -12,36 +13,42 @@ from typing import Dict, List, Optional, Any
 from urllib.parse import urljoin, urlparse
 
 import httpx
-from bs4 import BeautifulSoup, NavigableString, Tag
+from lxml import html
+
+# Import Cleaner from the separate lxml_html_clean package
+try:
+    from lxml_html_clean import Cleaner
+except ImportError:
+    # Fallback for older lxml versions
+    from lxml.html.clean import Cleaner
 
 logger = logging.getLogger(__name__)
 
 # User agent
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-# Elements to exclude (navigation, ads, sidebars, etc.)
-EXCLUDE_TAGS = {
-    "nav", "header", "footer", "aside", "script", "style", "noscript",
-    "iframe", "form", "button", "input", "select", "textarea", "svg",
-    "video", "audio", "canvas", "map", "figure", "figcaption"
-}
-
-EXCLUDE_CLASSES = {
-    "nav", "navbar", "navigation", "menu", "header", "footer", "sidebar",
-    "ad", "ads", "advertisement", "banner", "cookie", "popup", "modal",
-    "social", "share", "comment", "comments", "related", "recommended",
-    "breadcrumb", "pagination", "widget"
-}
-
-EXCLUDE_IDS = {
-    "nav", "navbar", "navigation", "menu", "header", "footer", "sidebar",
-    "ad", "ads", "advertisement", "banner", "cookie", "popup", "modal"
-}
+# XPath expressions for elements to exclude
+EXCLUDE_XPATH = """
+    //nav | //header | //footer | //aside | //script | //style | //noscript |
+    //iframe | //form | //button | //input | //select | //textarea | //svg |
+    //video | //audio | //canvas | //map | //*[contains(@class, 'nav')] |
+    //*[contains(@class, 'menu')] | //*[contains(@class, 'sidebar')] |
+    //*[contains(@class, 'footer')] | //*[contains(@class, 'header')] |
+    //*[contains(@class, 'ad')] | //*[contains(@class, 'advertisement')] |
+    //*[contains(@class, 'banner')] | //*[contains(@class, 'cookie')] |
+    //*[contains(@class, 'popup')] | //*[contains(@class, 'modal')] |
+    //*[contains(@class, 'social')] | //*[contains(@class, 'share')] |
+    //*[contains(@class, 'comment')] | //*[contains(@class, 'related')] |
+    //*[contains(@id, 'nav')] | //*[contains(@id, 'menu')] |
+    //*[contains(@id, 'sidebar')] | //*[contains(@id, 'footer')] |
+    //*[contains(@id, 'header')] | //*[contains(@id, 'ad')] |
+    //*[@aria-hidden='true']
+"""
 
 
 class LightpandaExtractor:
     """
-    Content extractor for web pages.
+    Content extractor for web pages using lxml.
     
     Extracts main article content while filtering out:
     - Navigation menus
@@ -67,6 +74,25 @@ class LightpandaExtractor:
             "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive"
         }
+        
+        # HTML cleaner for removing unwanted elements
+        self.cleaner = Cleaner(
+            scripts=True,
+            javascript=True,
+            comments=True,
+            style=True,
+            inline_style=True,
+            links=False,
+            meta=True,
+            page_structure=False,
+            processing_instructions=True,
+            remove_unknown_tags=False,
+            safe_attrs_only=False,
+            forms=True,
+            annoying_tags=True,
+            remove_tags=None,
+            kill_tags=['nav', 'header', 'footer', 'aside', 'noscript', 'iframe']
+        )
     
     async def extract(
         self,
@@ -84,8 +110,8 @@ class LightpandaExtractor:
             Dictionary with content, sections, and metadata
         """
         try:
-            html = await self._fetch_page(url)
-            return self._extract_content(html, url, include_structure)
+            html_content = await self._fetch_page(url)
+            return self._extract_content(html_content, url, include_structure)
         except Exception as e:
             logger.error(f"Failed to extract content from {url}: {e}")
             return {
@@ -104,21 +130,25 @@ class LightpandaExtractor:
     
     def _extract_content(
         self,
-        html: str,
+        html_content: str,
         url: str,
         include_structure: bool
     ) -> Dict[str, Any]:
         """Parse HTML and extract main content."""
-        soup = BeautifulSoup(html, "html.parser")
+        # Parse HTML
+        tree = html.fromstring(html_content)
         
-        # Extract metadata
-        metadata = self._extract_metadata(soup, url)
+        # Extract metadata first
+        metadata = self._extract_metadata(tree, url)
         
-        # Remove unwanted elements
-        self._clean_soup(soup)
+        # Clean the HTML
+        cleaned_tree = self.cleaner.clean_html(tree)
+        
+        # Remove additional unwanted elements
+        self._remove_unwanted_elements(cleaned_tree)
         
         # Find main content area
-        main_content = self._find_main_content(soup)
+        main_content = self._find_main_content(cleaned_tree)
         
         if include_structure:
             sections = self._extract_structured_content(main_content)
@@ -135,38 +165,38 @@ class LightpandaExtractor:
             "success": True
         }
     
-    def _extract_metadata(self, soup: BeautifulSoup, url: str) -> Dict:
+    def _extract_metadata(self, tree, url: str) -> Dict:
         """Extract page metadata (title, description, author, etc.)."""
         metadata = {"url": url}
         
         # Title
-        title_tag = soup.find("title")
-        if title_tag:
-            metadata["title"] = title_tag.get_text(strip=True)
+        title_elems = tree.xpath('//title/text()')
+        if title_elems:
+            metadata["title"] = title_elems[0].strip()
         
         # Meta description
-        desc_tag = soup.find("meta", attrs={"name": "description"})
-        if desc_tag:
-            metadata["description"] = desc_tag.get("content", "")
+        desc_elems = tree.xpath('//meta[@name="description"]/@content')
+        if desc_elems:
+            metadata["description"] = desc_elems[0]
         
         # Author
-        author_tag = soup.find("meta", attrs={"name": "author"})
-        if author_tag:
-            metadata["author"] = author_tag.get("content", "")
+        author_elems = tree.xpath('//meta[@name="author"]/@content')
+        if author_elems:
+            metadata["author"] = author_elems[0]
         
         # Published date
-        date_tag = soup.find("meta", attrs={"property": "article:published_time"})
-        if date_tag:
-            metadata["published_date"] = date_tag.get("content", "")
+        date_elems = tree.xpath('//meta[@property="article:published_time"]/@content')
+        if date_elems:
+            metadata["published_date"] = date_elems[0]
         
         # OG tags
-        og_title = soup.find("meta", attrs={"property": "og:title"})
+        og_title = tree.xpath('//meta[@property="og:title"]/@content')
         if og_title:
-            metadata["og_title"] = og_title.get("content", "")
+            metadata["og_title"] = og_title[0]
         
-        og_desc = soup.find("meta", attrs={"property": "og:description"})
+        og_desc = tree.xpath('//meta[@property="og:description"]/@content')
         if og_desc:
-            metadata["og_description"] = og_desc.get("content", "")
+            metadata["og_description"] = og_desc[0]
         
         # Domain
         parsed = urlparse(url)
@@ -174,71 +204,43 @@ class LightpandaExtractor:
         
         return metadata
     
-    def _clean_soup(self, soup: BeautifulSoup) -> None:
-        """Remove unwanted elements from soup."""
-        # Remove excluded tags
-        for tag in EXCLUDE_TAGS:
-            for element in soup.find_all(tag):
-                element.decompose()
-        
-        # Remove elements with excluded classes
-        for element in soup.find_all(class_=True):
-            classes = element.get("class", [])
-            if isinstance(classes, str):
-                classes = [classes]
-            
-            for cls in classes:
-                if any(exc in cls.lower() for exc in EXCLUDE_CLASSES):
-                    element.decompose()
-                    break
-        
-        # Remove elements with excluded IDs
-        for element in soup.find_all(id=True):
-            element_id = element.get("id", "").lower()
-            if any(exc in element_id for exc in EXCLUDE_IDS):
-                element.decompose()
-        
-        # Remove hidden elements
-        for element in soup.find_all(style=re.compile(r"display:\s*none", re.I)):
-            element.decompose()
-        
-        # Remove elements with aria-hidden="true"
-        for element in soup.find_all(attrs={"aria-hidden": "true"}):
-            element.decompose()
+    def _remove_unwanted_elements(self, tree) -> None:
+        """Remove unwanted elements from tree."""
+        try:
+            # Remove elements matching exclusion XPath
+            for element in tree.xpath(EXCLUDE_XPATH):
+                parent = element.getparent()
+                if parent is not None:
+                    parent.remove(element)
+        except Exception as e:
+            logger.warning(f"Error removing unwanted elements: {e}")
     
-    def _find_main_content(self, soup: BeautifulSoup) -> Tag:
+    def _find_main_content(self, tree):
         """Find the main content area of the page."""
         # Try semantic elements first
-        main = soup.find("main")
-        if main:
-            return main
+        selectors = [
+            '//main',
+            '//article',
+            '//*[@role="main"]',
+            '//*[@id="content"]',
+            '//*[@id="main-content"]',
+            '//*[@id="article"]',
+            '//*[@id="post"]',
+            '//*[@class="content"]',
+            '//*[@class="main-content"]',
+            '//*[@class="article"]',
+            '//*[@class="post"]',
+            '//body'
+        ]
         
-        article = soup.find("article")
-        if article:
-            return article
+        for selector in selectors:
+            elements = tree.xpath(selector)
+            if elements:
+                return elements[0]
         
-        # Try role="main"
-        main_role = soup.find(attrs={"role": "main"})
-        if main_role:
-            return main_role
-        
-        # Try common content IDs
-        for content_id in ["content", "main-content", "article", "post", "entry"]:
-            content = soup.find(id=content_id)
-            if content:
-                return content
-        
-        # Try common content classes
-        for content_class in ["content", "main-content", "article", "post", "entry"]:
-            content = soup.find(class_=content_class)
-            if content:
-                return content
-        
-        # Fall back to body
-        body = soup.find("body")
-        return body if body else soup
+        return tree
     
-    def _extract_structured_content(self, element: Tag) -> Dict[str, List[str]]:
+    def _extract_structured_content(self, element) -> Dict[str, List[str]]:
         """Extract content with structure preserved."""
         sections = {
             "h1": [],
@@ -251,41 +253,41 @@ class LightpandaExtractor:
             "code": []
         }
         
-        if not element:
+        if element is None:
             return sections
         
         # Extract headings
         for level in ["h1", "h2", "h3", "h4"]:
-            for heading in element.find_all(level):
-                text = heading.get_text(strip=True)
+            for heading in element.xpath(f'.//{level}'):
+                text = heading.text_content().strip()
                 if text and len(text) > 2:
                     sections[level].append(text)
         
         # Extract paragraphs
-        for p in element.find_all("p"):
-            text = p.get_text(strip=True)
+        for p in element.xpath('.//p'):
+            text = p.text_content().strip()
             if text and len(text) > 20:  # Filter out short paragraphs
                 sections["paragraphs"].append(text)
         
         # Extract lists
-        for ul in element.find_all(["ul", "ol"]):
+        for ul in element.xpath('.//ul | .//ol'):
             items = []
-            for li in ul.find_all("li", recursive=False):
-                text = li.get_text(strip=True)
+            for li in ul.xpath('./li'):
+                text = li.text_content().strip()
                 if text:
                     items.append(text)
             if items:
                 sections["lists"].append(items)
         
         # Extract blockquotes
-        for quote in element.find_all("blockquote"):
-            text = quote.get_text(strip=True)
+        for quote in element.xpath('.//blockquote'):
+            text = quote.text_content().strip()
             if text:
                 sections["blockquotes"].append(text)
         
         # Extract code blocks
-        for code in element.find_all(["code", "pre"]):
-            text = code.get_text(strip=True)
+        for code in element.xpath('.//code | .//pre'):
+            text = code.text_content().strip()
             if text and len(text) > 10:
                 sections["code"].append(text)
         
@@ -322,13 +324,13 @@ class LightpandaExtractor:
         
         return "\n".join(parts).strip()
     
-    def _extract_text_only(self, element: Tag) -> str:
+    def _extract_text_only(self, element) -> str:
         """Extract plain text without structure."""
-        if not element:
+        if element is None:
             return ""
         
         # Get all text
-        text = element.get_text(separator="\n", strip=True)
+        text = element.text_content()
         
         # Clean up whitespace
         lines = [line.strip() for line in text.split("\n") if line.strip()]
