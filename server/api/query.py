@@ -38,6 +38,38 @@ class QueryRequest(BaseModel):
     conversation_id: Optional[str] = None
     search_context: Optional[SearchContext] = None
 
+
+def _build_chat_history(previous_chats: List[Dict]) -> List[tuple[str, str]]:
+    """Normalize mixed chat-history schemas into LangChain chat history tuples."""
+    chat_history: List[tuple[str, str]] = []
+
+    for chat in reversed(previous_chats):
+        # Legacy schema: one record contains both question + answer
+        if "question" in chat or "answer" in chat:
+            question = chat.get("question")
+            answer = chat.get("answer")
+            if question:
+                chat_history.append(("human", question))
+            if answer:
+                chat_history.append(("ai", answer))
+            continue
+
+        # New schema: one record per message
+        message_type = chat.get("message_type")
+        if message_type == "_metadata":
+            continue
+
+        content = chat.get("content")
+        if not content:
+            continue
+
+        if message_type == "user":
+            chat_history.append(("human", content))
+        elif message_type == "assistant":
+            chat_history.append(("ai", content))
+
+    return chat_history
+
 # -------------------------------------------------
 # NORMAL QUERY (WITH MEMORY AND OPTIONAL WEB SEARCH)
 # -------------------------------------------------
@@ -110,10 +142,7 @@ async def query_documents(
     previous_chats = get_chat_history(user_id, limit=6)
 
     # 3️⃣ Convert DB records → LangChain format
-    chat_history = []
-    for chat in reversed(previous_chats):
-        chat_history.append(("human", chat["question"]))
-        chat_history.append(("ai", chat["answer"]))
+    chat_history = _build_chat_history(previous_chats)
 
     # 4️⃣ Call chain WITH chat_history
     try:
