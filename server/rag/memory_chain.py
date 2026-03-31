@@ -1,4 +1,4 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_classic.chains import ConversationalRetrievalChain
 from langchain_core.prompts import PromptTemplate
 from rag.retriever import get_retriever
@@ -9,8 +9,8 @@ import logging
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-pro")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # Custom prompt to rephrase questions for better document retrieval
 CONDENSE_QUESTION_PROMPT = PromptTemplate.from_template("""
@@ -60,10 +60,10 @@ def get_conversational_rag_chain(user_id: str):
     Create a conversational RAG chain that searches across ALL user documents.
     Uses custom prompts to better handle personal queries like "tell me about myself".
     """
-    llm = ChatGoogleGenerativeAI(
+    llm = ChatGroq(
         model=MODEL,
         temperature=0,
-        google_api_key=GOOGLE_API_KEY
+        groq_api_key=GROQ_API_KEY
     )
 
     # Get retriever with k=8 to search across more documents

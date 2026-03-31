@@ -49,7 +49,12 @@ export const documentsAPI = {
 
 // Query APIs
 export const queryAPI = {
-  query: (question) => api.post('/query/', { question }),
+  query: (question, filters = null, conversationId = null) => 
+    api.post('/query/', { 
+      question, 
+      filters, 
+      conversation_id: conversationId 
+    }),
   queryStream: async (question, onChunk, onComplete, onError) => {
     try {
       const response = await fetch(`${API_BASE_URL}/query/stream`, {
@@ -95,6 +100,33 @@ export const queryAPI = {
       onError && onError(error);
     }
   },
+};
+
+// Chat History APIs
+export const chatAPI = {
+  getConversations: (limit = 20, offset = 0) =>
+    api.get(`/chat/history?limit=${limit}&offset=${offset}`),
+  
+  getConversation: (conversationId) =>
+    api.get(`/chat/history/${conversationId}`),
+  
+  newConversation: (title = null) =>
+    api.post('/chat/new-conversation', { title }),
+  
+  renameConversation: (conversationId, title) =>
+    api.put(`/chat/history/${conversationId}`, { title }),
+  
+  deleteConversation: (conversationId) =>
+    api.delete(`/chat/history/${conversationId}`),
+  
+  deleteMessage: (conversationId, messageId) =>
+    api.delete(`/chat/history/${conversationId}/${messageId}`),
+  
+  clearAllHistory: () =>
+    api.delete('/chat/history?confirm=true'),
+  
+  searchHistory: (query, limit = 20) =>
+    api.get(`/chat/history/search?query=${encodeURIComponent(query)}&limit=${limit}`),
 };
 
 export default api;

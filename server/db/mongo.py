@@ -22,6 +22,10 @@ if not MONGO_URI:
 client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
 db = client[DB_NAME]
 
+def get_database():
+    """Get the MongoDB database instance."""
+    return db
+
 
 # Collections
 

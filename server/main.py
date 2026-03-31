@@ -7,6 +7,7 @@ from middleware.error_handler import error_handling_middleware
 
 from api.documents import router as documents_router
 from api.query import router as query_router
+from api.chat_history import router as chat_router
 
 app = FastAPI(title="DocTalk API")
 
@@ -28,6 +29,7 @@ from api.auth import router as auth_router
 app.include_router(auth_router)
 app.include_router(documents_router)
 app.include_router(query_router)
+app.include_router(chat_router, prefix="/chat", tags=["chat"])
 
 # ----------------------------
 # Health check

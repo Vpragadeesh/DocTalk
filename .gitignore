@@ -10,3 +10,5 @@ client/node_modules/
 /server/faiss_index
 UI_IMPROVEMENTS.md
 test_simple.html
+*.md
+server/.env.atlas.example
