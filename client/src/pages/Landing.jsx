@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { FileText, Upload, Shield, Sparkles, ArrowRight, Bot } from 'lucide-react';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-surface-950 relative overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* Background Orbs */}
       <div className="bg-orb w-64 sm:w-[500px] h-64 sm:h-[500px] bg-primary-600 top-[-15%] left-[-8%]" />
       <div className="bg-orb w-48 sm:w-[400px] h-48 sm:h-[400px] bg-accent-600 bottom-[-12%] right-[-5%]" style={{ animationDelay: '-8s' }} />
@@ -13,12 +14,13 @@ export default function Landing() {
         <nav className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 flex items-center justify-between">
           <div className="flex items-center space-x-2 sm:space-x-3">
             <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl flex items-center justify-center shadow-glow"
-              style={{ background: 'linear-gradient(135deg, #7c3aed, #06b6d4)' }}>
+              style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-hover))' }}>
               <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </div>
             <span className="text-lg sm:text-xl font-bold gradient-text">DocTalk</span>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-3">
+            <ThemeToggle variant="header" />
             <Link to="/login" className="btn-secondary text-xs sm:text-sm px-3 sm:px-5 py-2 sm:py-2.5">Sign In</Link>
             <Link to="/register" className="btn-primary text-xs sm:text-sm px-3 sm:px-5 py-2 sm:py-2.5">Get Started</Link>
           </div>
@@ -28,18 +30,24 @@ export default function Landing() {
       {/* Hero */}
       <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-12 pb-16 sm:pt-16 md:pt-24 sm:pb-24 md:pb-32">
         <div className="max-w-3xl mx-auto text-center animate-fade-in">
-          <div className="inline-flex items-center space-x-2 px-3 sm:px-4 py-1.5 rounded-full bg-primary-500/10 border border-primary-500/20 mb-6 sm:mb-8">
-            <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary-400" />
-            <span className="text-[10px] sm:text-xs font-medium text-primary-300">Powered by Google Gemini AI</span>
+          <div
+            className="mb-6 inline-flex items-center space-x-2 rounded-full px-3 py-1.5 sm:mb-8 sm:px-4"
+            style={{
+              background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--accent-primary) 26%, transparent)',
+            }}
+          >
+            <Sparkles className="h-3 w-3 text-[var(--accent-primary)] sm:h-3.5 sm:w-3.5" />
+            <span className="text-[10px] font-medium text-[var(--accent-primary)] sm:text-xs">Powered by Google Gemini AI</span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-4 sm:mb-6">
-            <span className="text-surface-100">Chat with Your</span>
+            <span className="text-[var(--text-primary)]">Chat with Your</span>
             <br />
             <span className="gradient-text">Documents</span>
           </h1>
 
-          <p className="text-sm sm:text-lg md:text-xl text-surface-400 mb-8 sm:mb-10 max-w-xl mx-auto leading-relaxed px-4 sm:px-0">
+          <p className="mx-auto mb-8 max-w-xl px-4 text-sm leading-relaxed text-[var(--text-secondary)] sm:mb-10 sm:px-0 sm:text-lg md:text-xl">
             Upload your documents and get instant, accurate answers powered by AI. No more manual searching.
           </p>
 
@@ -67,16 +75,16 @@ export default function Landing() {
               }`}>
                 <feat.icon className="h-5 w-5 sm:h-6 sm:w-6" />
               </div>
-              <h3 className="text-sm sm:text-base font-bold text-surface-100 mb-1.5 sm:mb-2">{feat.title}</h3>
-              <p className="text-xs sm:text-sm text-surface-500 leading-relaxed">{feat.desc}</p>
+              <h3 className="mb-1.5 text-sm font-bold text-[var(--text-primary)] sm:mb-2 sm:text-base">{feat.title}</h3>
+              <p className="text-xs leading-relaxed text-[var(--text-secondary)] sm:text-sm">{feat.desc}</p>
             </div>
           ))}
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-white/5 py-6 sm:py-8">
-        <p className="text-center text-[10px] sm:text-xs text-surface-600">&copy; 2026 DocTalk. All rights reserved.</p>
+      <footer className="relative z-10 border-t border-[var(--border-light)] py-6 sm:py-8">
+        <p className="text-center text-[10px] text-[var(--text-tertiary)] sm:text-xs">&copy; 2026 DocTalk. All rights reserved.</p>
       </footer>
     </div>
   );

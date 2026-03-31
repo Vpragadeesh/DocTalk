@@ -6,6 +6,16 @@ export default function FilterPanel({ documents, onFiltersChange, activeFilters 
   const [selectedDocIds, setSelectedDocIds] = useState([]);
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
 
+  const accentSurfaceStyle = {
+    background: "color-mix(in srgb, var(--accent-primary) 14%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--accent-primary) 28%, transparent)",
+    color: "var(--accent-primary)",
+  };
+
+  const gradientButtonStyle = {
+    background: "linear-gradient(135deg, var(--accent-primary), var(--accent-hover))",
+  };
+
   const handleApply = () => {
     if (selectedDocIds.length === 0 && !dateRange.from && !dateRange.to) {
       onFiltersChange(null);
@@ -35,14 +45,8 @@ export default function FilterPanel({ documents, onFiltersChange, activeFilters 
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-          activeFilters ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/30" : ""
-        }`}
-        style={
-          activeFilters
-            ? {}
-            : { background: "rgba(99, 102, 241, 0.08)", color: "#818cf8", border: "1px solid rgba(99, 102, 241, 0.15)" }
-        }
+        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all"
+        style={accentSurfaceStyle}
       >
         <Filter className="h-3.5 w-3.5" />
         <span>Filter</span>
@@ -57,17 +61,17 @@ export default function FilterPanel({ documents, onFiltersChange, activeFilters 
           {/* Panel */}
           <div
             className="absolute left-0 bottom-full mb-2 w-72 rounded-xl shadow-xl z-50"
-            style={{ background: "#111833", border: "1px solid rgba(99, 102, 241, 0.2)" }}
+            style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-light)" }}
           >
             {/* Header */}
-            <div
-              className="flex items-center justify-between px-4 py-3"
-              style={{ borderBottom: "1px solid rgba(99, 102, 241, 0.1)" }}
-            >
-              <h3 className="text-sm font-semibold" style={{ color: "#e2e8f0" }}>
+            <div className="flex items-center justify-between border-b border-[var(--border-light)] px-4 py-3">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                 Filter Results
               </h3>
-              <button onClick={() => setIsOpen(false)} style={{ color: "#64748b" }}>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-[var(--text-tertiary)] transition-colors hover:text-[var(--text-primary)]"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -75,12 +79,12 @@ export default function FilterPanel({ documents, onFiltersChange, activeFilters 
             <div className="p-4 space-y-4 max-h-80 overflow-y-auto custom-scrollbar">
               {/* Documents */}
               <div>
-                <label className="flex items-center gap-2 text-xs font-medium mb-2" style={{ color: "#94a3b8" }}>
+                <label className="mb-2 flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
                   <FileText className="h-3.5 w-3.5" />
                   Documents
                 </label>
                 {documents.length === 0 ? (
-                  <p className="text-xs" style={{ color: "#475569" }}>
+                  <p className="text-xs text-[var(--text-tertiary)]">
                     No documents uploaded
                   </p>
                 ) : (
@@ -88,16 +92,15 @@ export default function FilterPanel({ documents, onFiltersChange, activeFilters 
                     {documents.map((doc) => (
                       <label
                         key={doc.file_id}
-                        className="flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors hover:bg-gray-800/30"
-                        style={{ border: "1px solid rgba(99, 102, 241, 0.08)" }}
+                        className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-light)] p-2 transition-colors hover:bg-[var(--bg-hover)]"
                       >
                         <input
                           type="checkbox"
                           checked={selectedDocIds.includes(doc.file_id)}
                           onChange={() => toggleDocument(doc.file_id)}
-                          className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500/20"
+                          className="h-3.5 w-3.5 rounded border-[var(--border-medium)] bg-[var(--bg-secondary)] text-[var(--accent-primary)] focus:ring-[color:color-mix(in_srgb,var(--accent-primary)_25%,transparent)]"
                         />
-                        <span className="text-xs truncate flex-1" style={{ color: "#cbd5e1" }}>
+                        <span className="flex-1 truncate text-xs text-[var(--text-primary)]">
                           {doc.filename}
                         </span>
                       </label>
@@ -108,7 +111,7 @@ export default function FilterPanel({ documents, onFiltersChange, activeFilters 
 
               {/* Date Range */}
               <div>
-                <label className="flex items-center gap-2 text-xs font-medium mb-2" style={{ color: "#94a3b8" }}>
+                <label className="mb-2 flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
                   <Calendar className="h-3.5 w-3.5" />
                   Date Range
                 </label>
@@ -117,35 +120,30 @@ export default function FilterPanel({ documents, onFiltersChange, activeFilters 
                     type="date"
                     value={dateRange.from}
                     onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
-                    className="flex-1 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none"
-                    style={{ background: "#0d1224", border: "1px solid rgba(99, 102, 241, 0.1)", color: "#94a3b8" }}
+                    className="flex-1 rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none"
                   />
-                  <span className="text-xs" style={{ color: "#475569" }}>
+                  <span className="text-xs text-[var(--text-tertiary)]">
                     to
                   </span>
                   <input
                     type="date"
                     value={dateRange.to}
                     onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
-                    className="flex-1 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none"
-                    style={{ background: "#0d1224", border: "1px solid rgba(99, 102, 241, 0.1)", color: "#94a3b8" }}
+                    className="flex-1 rounded-lg border border-[var(--border-light)] bg-[var(--bg-tertiary)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none"
                   />
                 </div>
               </div>
             </div>
 
             {/* Footer */}
-            <div
-              className="flex items-center justify-between px-4 py-3"
-              style={{ borderTop: "1px solid rgba(99, 102, 241, 0.1)" }}
-            >
-              <button onClick={handleClear} className="text-xs" style={{ color: "#f87171" }}>
+            <div className="flex items-center justify-between border-t border-[var(--border-light)] px-4 py-3">
+              <button onClick={handleClear} className="text-xs text-[var(--error)]">
                 Clear all
               </button>
               <button
                 onClick={handleApply}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-white"
-                style={{ background: "linear-gradient(135deg, #6366f1, #06b6d4)" }}
+                style={gradientButtonStyle}
               >
                 Apply Filters
               </button>

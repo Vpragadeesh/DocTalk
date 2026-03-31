@@ -22,6 +22,7 @@ import {
   Grid,
   List,
 } from "lucide-react";
+import ThemeToggle from "../components/ThemeToggle";
 
 export default function Documents() {
   const { logout } = useAuth();
@@ -117,49 +118,66 @@ export default function Documents() {
     return colors[ext] || '#818cf8';
   };
 
+  const accentSurfaceStyle = {
+    background: "color-mix(in srgb, var(--accent-primary) 14%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--accent-primary) 28%, transparent)",
+    color: "var(--accent-primary)",
+  };
+
+  const successSurfaceStyle = {
+    background: "color-mix(in srgb, var(--success) 14%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)",
+    color: "var(--success)",
+  };
+
+  const dangerSurfaceStyle = {
+    background: "color-mix(in srgb, var(--error) 14%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--error) 28%, transparent)",
+    color: "var(--error)",
+  };
+
+  const gradientButtonStyle = {
+    background: "linear-gradient(135deg, var(--accent-primary), var(--accent-hover))",
+  };
+
   return (
-    <div className="h-screen flex flex-col" style={{ background: '#0a0e1a' }}>
+    <div className="flex h-screen flex-col bg-[var(--bg-primary)] text-[var(--text-primary)]">
       {/* Header */}
-      <header
-        className="flex-shrink-0 flex items-center justify-between px-4 sm:px-6 py-3"
-        style={{
-          background: 'linear-gradient(90deg, #0d1224, #111833)',
-          borderBottom: '1px solid rgba(99, 102, 241, 0.12)',
-        }}
-      >
+      <header className="flex flex-shrink-0 items-center justify-between border-b border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/dashboard')}
-            className="p-2 rounded-lg transition-colors hover:bg-gray-800"
-            style={{ color: '#94a3b8' }}
+            className="rounded-lg p-2 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div
             className="h-9 w-9 rounded-lg flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #06b6d4)' }}
+            style={gradientButtonStyle}
           >
             <FolderOpen className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-base font-bold" style={{ color: '#c7d2fe' }}>My Documents</h1>
-            <p className="text-xs" style={{ color: '#64748b' }}>{documents.length} document{documents.length !== 1 ? 's' : ''}</p>
+            <h1 className="text-base font-bold text-[var(--text-primary)]">My Documents</h1>
+            <p className="text-xs text-[var(--text-tertiary)]">{documents.length} document{documents.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          <ThemeToggle variant="header" />
+
           <button
             onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-            style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#22d3ee', border: '1px solid rgba(6, 182, 212, 0.2)' }}
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all"
+            style={accentSurfaceStyle}
           >
             <MessageSquare className="h-4 w-4" />
             <span className="hidden sm:inline">Chat</span>
           </button>
           <button
             onClick={logout}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-            style={{ color: '#f87171', border: '1px solid rgba(248, 113, 113, 0.15)' }}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all"
+            style={dangerSurfaceStyle}
           >
             <LogOut className="h-4 w-4" />
             <span className="hidden sm:inline">Logout</span>
@@ -170,18 +188,17 @@ export default function Documents() {
       {/* Main Content */}
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* Toolbar */}
-        <div className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between" style={{ borderBottom: '1px solid rgba(99, 102, 241, 0.08)' }}>
+        <div className="flex flex-col gap-3 border-b border-[var(--border-light)] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex flex-1 gap-3 items-center">
             {/* Search */}
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#64748b' }} />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-tertiary)]" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search documents..."
-                className="w-full pl-10 pr-4 py-2 rounded-lg text-sm outline-none transition-all"
-                style={{ background: '#0d1224', border: '1px solid rgba(99, 102, 241, 0.15)', color: '#e2e8f0' }}
+                className="w-full rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] py-2 pl-10 pr-4 text-sm text-[var(--text-primary)] outline-none transition-all placeholder:text-[var(--text-placeholder)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--accent-primary)_30%,transparent)]"
               />
             </div>
 
@@ -189,8 +206,7 @@ export default function Documents() {
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 rounded-lg text-sm outline-none cursor-pointer"
-              style={{ background: '#0d1224', border: '1px solid rgba(99, 102, 241, 0.15)', color: '#e2e8f0' }}
+              className="cursor-pointer rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>
@@ -200,18 +216,24 @@ export default function Documents() {
             </select>
 
             {/* View Toggle */}
-            <div className="hidden sm:flex items-center rounded-lg p-1" style={{ background: '#0d1224', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
+            <div className="hidden items-center rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-1 sm:flex">
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded transition-colors ${viewMode === 'list' ? 'bg-indigo-600' : ''}`}
-                style={{ color: viewMode === 'list' ? '#fff' : '#64748b' }}
+                className={`rounded p-1.5 transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-[var(--accent-primary)] text-white'
+                    : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+                }`}
               >
                 <List className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-indigo-600' : ''}`}
-                style={{ color: viewMode === 'grid' ? '#fff' : '#64748b' }}
+                className={`rounded p-1.5 transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-[var(--accent-primary)] text-white'
+                    : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+                }`}
               >
                 <Grid className="h-4 w-4" />
               </button>
@@ -225,14 +247,13 @@ export default function Documents() {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Category"
-              className="w-28 px-3 py-2 rounded-lg text-sm outline-none"
-              style={{ background: '#0d1224', border: '1px solid rgba(99, 102, 241, 0.15)', color: '#e2e8f0' }}
+              className="w-28 rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
             />
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-50"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #06b6d4)' }}
+              style={gradientButtonStyle}
             >
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               <span>{uploading ? "Uploading..." : "Upload"}</span>
@@ -245,25 +266,25 @@ export default function Documents() {
         {(error || success || uploading) && (
           <div className="px-4 sm:px-6 py-2">
             {uploading && (
-              <div className="mb-2 p-3 rounded-lg" style={{ background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
-                <div className="flex justify-between text-sm mb-2" style={{ color: '#818cf8' }}>
+              <div className="mb-2 rounded-lg p-3" style={accentSurfaceStyle}>
+                <div className="mb-2 flex justify-between text-sm">
                   <span>Uploading...</span>
                   <span>{uploadProgress}%</span>
                 </div>
-                <div className="w-full h-1.5 rounded-full" style={{ background: '#1e293b' }}>
-                  <div className="h-full rounded-full transition-all" style={{ width: `${uploadProgress}%`, background: 'linear-gradient(90deg, #6366f1, #06b6d4)' }} />
+                <div className="h-1.5 w-full rounded-full bg-[var(--bg-tertiary)]">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${uploadProgress}%`, ...gradientButtonStyle }} />
                 </div>
               </div>
             )}
             {error && (
-              <div className="mb-2 px-4 py-3 rounded-lg flex items-center gap-2" style={{ background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.12)', color: '#fca5a5' }}>
+              <div className="mb-2 flex items-center gap-2 rounded-lg px-4 py-3" style={dangerSurfaceStyle}>
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 <span className="flex-1 text-sm">{error}</span>
                 <button onClick={() => setError("")}><X className="h-4 w-4" /></button>
               </div>
             )}
             {success && (
-              <div className="mb-2 px-4 py-3 rounded-lg flex items-center gap-2" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.12)', color: '#6ee7b7' }}>
+              <div className="mb-2 flex items-center gap-2 rounded-lg px-4 py-3" style={successSurfaceStyle}>
                 <CheckCircle className="h-4 w-4 flex-shrink-0" />
                 <span className="flex-1 text-sm">{success}</span>
                 <button onClick={() => setSuccess("")}><X className="h-4 w-4" /></button>
@@ -278,14 +299,14 @@ export default function Documents() {
             <div className="flex flex-col items-center justify-center h-full text-center">
               <div
                 className="h-20 w-20 rounded-2xl flex items-center justify-center mb-4"
-                style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.12)' }}
+                style={accentSurfaceStyle}
               >
-                <FolderOpen className="h-10 w-10" style={{ color: '#4f46e5' }} />
+                <FolderOpen className="h-10 w-10 text-[var(--accent-primary)]" />
               </div>
-              <h3 className="text-lg font-semibold mb-2" style={{ color: '#e2e8f0' }}>
+              <h3 className="mb-2 text-lg font-semibold text-[var(--text-primary)]">
                 {searchQuery || selectedCategory !== "all" ? "No documents found" : "No documents yet"}
               </h3>
-              <p className="text-sm mb-4" style={{ color: '#64748b' }}>
+              <p className="mb-4 text-sm text-[var(--text-secondary)]">
                 {searchQuery || selectedCategory !== "all" 
                   ? "Try adjusting your search or filters" 
                   : "Upload your first document to get started"}
@@ -294,7 +315,7 @@ export default function Documents() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white"
-                  style={{ background: 'linear-gradient(135deg, #6366f1, #06b6d4)' }}
+                  style={gradientButtonStyle}
                 >
                   <Plus className="h-4 w-4" />
                   Upload Document
@@ -308,7 +329,7 @@ export default function Documents() {
                 <div
                   key={doc.file_id}
                   className="group p-4 rounded-xl transition-all hover:scale-[1.02]"
-                  style={{ background: '#0d1224', border: '1px solid rgba(99, 102, 241, 0.1)' }}
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)' }}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div
@@ -320,20 +341,23 @@ export default function Documents() {
                     <button
                       onClick={() => handleDeleteDocument(doc.file_id)}
                       className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                      style={{ color: '#f87171', background: 'rgba(248, 113, 113, 0.1)' }}
+                      style={{
+                        color: 'var(--error)',
+                        background: 'color-mix(in srgb, var(--error) 16%, transparent)',
+                      }}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                  <h4 className="text-sm font-medium truncate mb-1" style={{ color: '#e2e8f0' }}>{doc.filename}</h4>
-                  <div className="flex items-center gap-2 text-xs" style={{ color: '#64748b' }}>
+                  <h4 className="mb-1 truncate text-sm font-medium text-[var(--text-primary)]">{doc.filename}</h4>
+                  <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
                     <Clock className="h-3 w-3" />
                     <span>{new Date(doc.uploaded_at).toLocaleDateString()}</span>
                   </div>
                   {doc.category && (
                     <span
                       className="inline-block mt-2 px-2 py-0.5 rounded text-xs"
-                      style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8' }}
+                      style={accentSurfaceStyle}
                     >
                       {doc.category}
                     </span>
@@ -347,8 +371,8 @@ export default function Documents() {
               {filteredDocuments.map((doc) => (
                 <div
                   key={doc.file_id}
-                  className="group flex items-center gap-4 p-4 rounded-xl transition-all hover:bg-opacity-50"
-                  style={{ background: '#0d1224', border: '1px solid rgba(99, 102, 241, 0.1)' }}
+                  className="group flex items-center gap-4 rounded-xl p-4 transition-all hover:bg-[var(--bg-hover)]"
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-light)' }}
                 >
                   <div
                     className="h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -357,8 +381,8 @@ export default function Documents() {
                     <FileText className="h-5 w-5" style={{ color: getFileIcon(doc.filename) }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-medium truncate" style={{ color: '#e2e8f0' }}>{doc.filename}</h4>
-                    <div className="flex items-center gap-3 mt-0.5 text-xs" style={{ color: '#64748b' }}>
+                    <h4 className="truncate text-sm font-medium text-[var(--text-primary)]">{doc.filename}</h4>
+                    <div className="mt-0.5 flex items-center gap-3 text-xs text-[var(--text-tertiary)]">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {new Date(doc.uploaded_at).toLocaleDateString()}
@@ -366,7 +390,7 @@ export default function Documents() {
                       {doc.category && (
                         <span
                           className="px-2 py-0.5 rounded"
-                          style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8' }}
+                          style={accentSurfaceStyle}
                         >
                           {doc.category}
                         </span>
@@ -376,7 +400,10 @@ export default function Documents() {
                   <button
                     onClick={() => handleDeleteDocument(doc.file_id)}
                     className="p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                    style={{ color: '#f87171', background: 'rgba(248, 113, 113, 0.1)' }}
+                    style={{
+                      color: 'var(--error)',
+                      background: 'color-mix(in srgb, var(--error) 16%, transparent)',
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
