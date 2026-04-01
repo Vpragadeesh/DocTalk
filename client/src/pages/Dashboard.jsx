@@ -25,6 +25,7 @@ import {
   Filter as FilterIcon,
   FolderOpen,
   Globe,
+  Brain,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -202,6 +203,19 @@ export default function Dashboard() {
 
         <div className="flex items-center gap-3">
           <ThemeToggle variant="header" />
+
+          {/* Deep Search Link */}
+          <button
+            onClick={() => navigate('/deep-search')}
+            className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-px"
+            style={{
+              background: "linear-gradient(135deg, var(--accent-primary), var(--accent-hover))",
+              color: "white",
+            }}
+          >
+            <Brain className="h-4 w-4" />
+            <span>Deep Search</span>
+          </button>
 
           {/* Documents Link */}
           <button
