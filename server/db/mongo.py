@@ -35,6 +35,12 @@ chunks_col = db["chunks"]
 chat_history_col = db["chat_history"]
 faiss_metadata_col = db["faiss_metadata"]  # For FAISS index metadata
 
+# Deep Search Collections (Knowledge Graph)
+document_concepts_col = db["document_concepts"]
+concept_relationships_col = db["concept_relationships"]
+reasoning_cache_col = db["reasoning_cache"]
+deep_search_history_col = db["deep_search_history"]
+
 
 # Database & Index Initialization
 
@@ -57,6 +63,59 @@ def init_db():
         ("user_id", ASCENDING),
         ("timestamp", DESCENDING)
     ])
+    
+    # Deep Search / Knowledge Graph indexes
+    document_concepts_col.create_index([
+        ("user_id", ASCENDING),
+        ("concept_id", ASCENDING)
+    ], unique=True)
+    document_concepts_col.create_index([
+        ("user_id", ASCENDING),
+        ("normalized_name", ASCENDING)
+    ])
+    document_concepts_col.create_index([
+        ("user_id", ASCENDING),
+        ("document_ids", ASCENDING)
+    ])
+    document_concepts_col.create_index([
+        ("user_id", ASCENDING),
+        ("importance", DESCENDING)
+    ])
+    
+    concept_relationships_col.create_index([
+        ("user_id", ASCENDING),
+        ("relationship_id", ASCENDING)
+    ], unique=True)
+    concept_relationships_col.create_index([
+        ("user_id", ASCENDING),
+        ("source_concept_id", ASCENDING)
+    ])
+    concept_relationships_col.create_index([
+        ("user_id", ASCENDING),
+        ("target_concept_id", ASCENDING)
+    ])
+    concept_relationships_col.create_index([
+        ("user_id", ASCENDING),
+        ("relationship_type", ASCENDING)
+    ])
+    
+    reasoning_cache_col.create_index([
+        ("user_id", ASCENDING),
+        ("query_hash", ASCENDING)
+    ], unique=True)
+    reasoning_cache_col.create_index([
+        ("created_at", ASCENDING)
+    ], expireAfterSeconds=3600)  # TTL index - auto-delete after 1 hour
+    
+    # Deep Search History indexes
+    deep_search_history_col.create_index([
+        ("user_id", ASCENDING),
+        ("created_at", DESCENDING)
+    ])
+    deep_search_history_col.create_index([
+        ("user_id", ASCENDING),
+        ("search_id", ASCENDING)
+    ], unique=True)
 
 
 # USER OPERATIONS
@@ -230,6 +289,66 @@ def delete_chat_history(user_id: str) -> None:
 
 
 
+# DEEP SEARCH HISTORY OPERATIONS
+
+def save_deep_search(
+    user_id: str,
+    query: str,
+    depth: str,
+    result: dict,
+    reasoning_chain: list = None,
+    relationships: list = None,
+    processing_time_ms: int = 0
+) -> dict:
+    """
+    Save a deep search to history.
+    """
+    search_id = str(uuid.uuid4())
+    search_record = {
+        "search_id": search_id,
+        "user_id": user_id,
+        "query": query,
+        "depth": depth,
+        "answer": result.get("answer", ""),
+        "confidence": result.get("confidence", 0),
+        "reasoning_chain": reasoning_chain or [],
+        "relationships": relationships or [],
+        "sources": result.get("sources", []),
+        "processing_time_ms": processing_time_ms,
+        "created_at": datetime.utcnow()
+    }
+    deep_search_history_col.insert_one(search_record)
+    return {"search_id": search_id}
+
+
+def get_deep_search_history(user_id: str, limit: int = 20) -> list:
+    """
+    Get recent deep search history for a user.
+    """
+    return list(deep_search_history_col.find(
+        {"user_id": user_id},
+        {"_id": 0}
+    ).sort("created_at", DESCENDING).limit(limit))
+
+
+def get_deep_search_by_id(user_id: str, search_id: str) -> dict | None:
+    """
+    Get a specific deep search by ID.
+    """
+    return deep_search_history_col.find_one(
+        {"user_id": user_id, "search_id": search_id},
+        {"_id": 0}
+    )
+
+
+def delete_deep_search_history(user_id: str) -> None:
+    """
+    Delete user's deep search history.
+    """
+    deep_search_history_col.delete_many({"user_id": user_id})
+
+
+
 # DATABASE CLEANUP (OPTIONAL / ADMIN)
 
 def delete_user_data(user_id: str) -> None:
@@ -239,6 +358,10 @@ def delete_user_data(user_id: str) -> None:
     documents_col.delete_many({"user_id": user_id})
     chunks_col.delete_many({"user_id": user_id})
     chat_history_col.delete_many({"user_id": user_id})
+    deep_search_history_col.delete_many({"user_id": user_id})
+    document_concepts_col.delete_many({"user_id": user_id})
+    concept_relationships_col.delete_many({"user_id": user_id})
+    reasoning_cache_col.delete_many({"user_id": user_id})
     users_col.delete_one({"user_id": user_id})
 
 
