@@ -29,8 +29,12 @@ class QueryFilters(BaseModel):
 class SearchContext(BaseModel):
     """Web search context options."""
     enable_web_search: bool = False
-    search_type: str = "hybrid"  # hybrid, web_only
+    search_type: str = "hybrid"  # hybrid, web_only, perplexica
     max_web_results: int = 5
+    # Perplexica options
+    use_perplexica: bool = False
+    perplexica_focus_mode: str = "webSearch"
+    auto_web_threshold: float = 0.6
 
 class QueryRequest(BaseModel):
     question: str
@@ -107,7 +111,46 @@ async def query_documents(
 
     # Check if web search is enabled
     web_context = ""
-    if search_context and search_context.enable_web_search:
+    perplexica_answer = ""
+    
+    # Perplexica search (if enabled)
+    if search_context and search_context.use_perplexica:
+        try:
+            from services.perplexica_service import get_perplexica_service
+            from config.perplexica import FocusMode
+            
+            service = get_perplexica_service()
+            focus_mode = FocusMode(search_context.perplexica_focus_mode)
+            
+            result = await service.search(
+                query=question,
+                focus_mode=focus_mode,
+                use_cache=True
+            )
+            
+            if not result.error and result.sources:
+                perplexica_answer = result.answer
+                
+                # Build web context from Perplexica
+                web_parts = []
+                for src in result.sources[:search_context.max_web_results]:
+                    web_sources.append({
+                        "source": "perplexica",
+                        "title": src.title,
+                        "url": src.url,
+                        "snippet": src.snippet
+                    })
+                    web_parts.append(f"**{src.title}**\n{src.snippet}\nURL: {src.url}")
+                
+                web_context = "\n\n---\n\n".join(web_parts)
+                logger.info(f"Added {len(result.sources)} Perplexica results")
+                
+        except Exception as e:
+            logger.error(f"Perplexica search failed: {e}")
+            # Fall back to MCP if available
+    
+    # MCP web search fallback (if Perplexica not used or failed)
+    if search_context and search_context.enable_web_search and not web_sources:
         try:
             from mcp.mcp_client import get_mcp_client, format_web_results_for_context
             
