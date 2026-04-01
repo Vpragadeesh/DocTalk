@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Documents from './pages/Documents';
+import DeepSearch from './pages/DeepSearch';
 import './index.css';
 
 function App() {
@@ -33,6 +34,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Documents />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/deep-search"
+              element={
+                <ProtectedRoute>
+                  <DeepSearch />
                 </ProtectedRoute>
               }
             />
