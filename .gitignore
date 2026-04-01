@@ -11,4 +11,5 @@ client/node_modules/
 UI_IMPROVEMENTS.md
 test_simple.html
 *.md
+*.txt
 server/.env.atlas.example
