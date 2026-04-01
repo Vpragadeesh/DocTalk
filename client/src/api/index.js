@@ -200,4 +200,41 @@ export const chatAPI = {
     api.get(`/chat/history/search?query=${encodeURIComponent(query)}&limit=${limit}`),
 };
 
+// Perplexica AI Search APIs
+export const perplexicaAPI = {
+  // Web search with focus modes
+  search: (query, options = {}) =>
+    api.post('/perplexica/search', {
+      query,
+      focus_mode: options.focusMode || 'webSearch',
+      use_cache: options.useCache !== false,
+      history: options.history || []
+    }),
+  
+  // Hybrid search (documents + web)
+  hybridSearch: (query, options = {}) =>
+    api.post('/perplexica/hybrid', {
+      query,
+      search_documents: options.searchDocuments !== false,
+      search_web: options.searchWeb !== false,
+      focus_mode: options.focusMode || 'webSearch',
+      doc_top_k: options.docTopK || 5,
+      web_top_k: options.webTopK || 5,
+      auto_web_threshold: options.autoWebThreshold || 0.6,
+      use_cache: options.useCache !== false
+    }),
+  
+  // Get service health
+  getHealth: () =>
+    api.get('/perplexica/health'),
+  
+  // Get available focus modes
+  getFocusModes: () =>
+    api.get('/perplexica/focus-modes'),
+  
+  // Clear search cache
+  clearCache: () =>
+    api.delete('/perplexica/cache'),
+};
+
 export default api;
