@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
 import { queryAPI } from '../api/index';
 import ThemeToggle from './ThemeToggle';
+import { Brain } from 'lucide-react';
 
 const ChatLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -104,6 +106,19 @@ const ChatLayout = () => {
             </svg>
           </button>
           <h1 className="m-0 text-lg font-semibold text-[var(--text-primary)]">DocTalk</h1>
+          
+          {/* Deep Search Button */}
+          <Link
+            to="/deep-search"
+            className="ml-4 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white transition-all hover:opacity-90"
+            style={{
+              background: "linear-gradient(135deg, var(--accent-primary), var(--accent-hover))",
+            }}
+          >
+            <Brain className="h-4 w-4" />
+            <span>Deep Search</span>
+          </Link>
+          
           <div className="ml-auto">
             <ThemeToggle variant="header" />
           </div>
