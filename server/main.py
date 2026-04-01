@@ -9,6 +9,7 @@ from api.documents import router as documents_router
 from api.query import router as query_router
 from api.chat_history import router as chat_router
 from api.search import router as search_router
+from api.deep_search_api import router as deep_search_router
 
 app = FastAPI(title="DocTalk API")
 
@@ -32,6 +33,7 @@ app.include_router(documents_router)
 app.include_router(query_router)
 app.include_router(chat_router, prefix="/chat", tags=["chat"])
 app.include_router(search_router)
+app.include_router(deep_search_router)
 
 # ----------------------------
 # Health check
