@@ -17,6 +17,9 @@ langchain-huggingface
 langchain-groq
 langchain-google-genai
 
+# Anthropic (for Deep Search reasoning)
+anthropic
+
 # Database
 pymongo
 faiss-cpu
