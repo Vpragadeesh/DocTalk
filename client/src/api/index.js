@@ -125,6 +125,54 @@ export const searchAPI = {
     api.delete(`/search/cache/${queryHash}`),
 };
 
+// Deep Search APIs
+export const deepSearchAPI = {
+  // Main deep search endpoint
+  search: (query, options = {}) =>
+    api.post('/search/deep', {
+      query,
+      depth: options.depth || 'moderate',
+      include_reasoning: options.includeReasoning !== false,
+      cross_document: options.crossDocument !== false,
+      context_limit: options.contextLimit || 20000,
+      conversation_id: options.conversationId,
+    }),
+  
+  // Get detailed reasoning steps
+  getReasoning: (query, depth = 'moderate') =>
+    api.post('/search/deep/reasoning', { query, depth }),
+  
+  // Get document/concept relationships
+  getRelationships: (options = {}) => {
+    const params = new URLSearchParams();
+    if (options.documentId) params.append('document_id', options.documentId);
+    if (options.concept) params.append('concept', options.concept);
+    if (options.limit) params.append('limit', options.limit);
+    return api.get(`/search/relationships?${params.toString()}`);
+  },
+  
+  // Cross-document search
+  crossDocumentSearch: (query, documentIds = null) =>
+    api.post('/search/cross-document', {
+      query,
+      document_ids: documentIds,
+    }),
+  
+  // Health check
+  getHealth: () =>
+    api.get('/search/deep/health'),
+  
+  // History
+  getHistory: (limit = 20) =>
+    api.get(`/search/deep/history?limit=${limit}`),
+  
+  getSearchById: (searchId) =>
+    api.get(`/search/deep/history/${searchId}`),
+  
+  clearHistory: () =>
+    api.delete('/search/deep/history'),
+};
+
 // Chat History APIs
 export const chatAPI = {
   getConversations: (limit = 20, offset = 0) =>
