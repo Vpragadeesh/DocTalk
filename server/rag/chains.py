@@ -1,4 +1,4 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from rag.retriever import get_retriever
@@ -6,15 +6,15 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-MODEL = os.getenv("GEMINI_MODEL")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
 def get_rag_chain(user_id: str):
-    llm = ChatGoogleGenerativeAI(
+    llm = ChatGroq(
         model=MODEL,
         temperature=0,
-        google_api_key=GOOGLE_API_KEY
+        groq_api_key=GROQ_API_KEY
     )
 
     prompt = PromptTemplate(

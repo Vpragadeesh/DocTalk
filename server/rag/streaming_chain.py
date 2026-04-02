@@ -1,5 +1,5 @@
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain_classic.chains import RetrievalQA
 from langchain_core.prompts import PromptTemplate
 from langchain_core.callbacks import BaseCallbackHandler
@@ -9,8 +9,8 @@ from queue import Queue
 from threading import Thread
 
 load_dotenv()
-MODEL = os.getenv("GEMINI_MODEL", "gemini-pro")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
 class StreamingCallbackHandler(BaseCallbackHandler):
@@ -27,11 +27,11 @@ class StreamingCallbackHandler(BaseCallbackHandler):
 
 
 def get_streaming_rag_chain(user_id: str):
-    llm = ChatGoogleGenerativeAI(
+    llm = ChatGroq(
         model=MODEL,
         temperature=0,
         streaming=True,
-        google_api_key=GOOGLE_API_KEY
+        groq_api_key=GROQ_API_KEY
     )
 
     prompt = PromptTemplate(
@@ -70,10 +70,11 @@ def stream_rag_response(user_id: str, question: str):
     queue = Queue()
     callback = StreamingCallbackHandler(queue)
     
-    llm = ChatGoogleGenerativeAI(
+    llm = ChatGroq(
         model=MODEL,
         temperature=0,
         streaming=True,
+        groq_api_key=GROQ_API_KEY,
         callbacks=[callback]
     )
 

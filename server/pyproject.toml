@@ -1,0 +1,61 @@
+[project]
+name = "doctalk-server"
+version = "1.0.0"
+description = "DocTalk RAG Server - Document Q&A with AI"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # FastAPI & Server
+    "fastapi",
+    "uvicorn[standard]",
+    "python-multipart",
+    "pydantic>=2.0",
+    
+    # LangChain ecosystem
+    "langchain",
+    "langchain-classic",
+    "langchain-core",
+    "langchain-community",
+    "langchain-text-splitters",
+    "langchain-huggingface",
+    "langchain-groq",
+    "langchain-google-genai",
+    
+    # Database
+    "pymongo",
+    "faiss-cpu",
+    
+    # Authentication
+    "python-jose[cryptography]",
+    "passlib[bcrypt]",
+    "bcrypt==4.0.1",
+    
+    # Document Processing
+    "pypdf",
+    "docx2txt",
+    
+    # Web Search (lxml for fast HTML parsing)
+    "httpx",
+    "lxml",
+    "lxml-html-clean",
+    "cssselect",
+    
+    # Utilities
+    "python-dotenv",
+    "certifi",
+    
+    # ML/Embeddings
+    "torch",
+    "sentence-transformers",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[project.scripts]
+doctalk = "main:app"

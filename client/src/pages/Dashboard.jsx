@@ -1,44 +1,52 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { documentsAPI, queryAPI } from "../api";
+import { documentsAPI, queryAPI, chatAPI } from "../api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import FilterPanel from "../components/FilterPanel";
+import ChatHistory from "../components/ChatHistory";
+import SourceViewer from "../components/SourceViewer";
+import SearchMode, { SearchModeIndicator } from "../components/SearchMode";
+import ThemeToggle from "../components/ThemeToggle";
 import {
-  Upload,
-  File,
-  Trash2,
   LogOut,
   Send,
   FileText,
   MessageSquare,
   Loader2,
   AlertCircle,
-  CheckCircle,
   Bot,
   User,
   Sparkles,
-  Clock,
   X,
   ChevronDown,
-  Zap,
-  Menu,
   Plus,
+  Filter as FilterIcon,
+  FolderOpen,
+  Globe,
+  Brain,
 } from "lucide-react";
 
 export default function Dashboard() {
   const { logout } = useAuth();
+  const navigate = useNavigate();
   const [documents, setDocuments] = useState([]);
   const [messages, setMessages] = useState([]);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [expandedSources, setExpandedSources] = useState({});
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState(null);
+  const [searchMode, setSearchMode] = useState('docs_only'); // docs_only, hybrid, web_only
+  
+  // Chat history state
+  const [currentConversationId, setCurrentConversationId] = useState(null);
+  const [chatHistoryCollapsed, setChatHistoryCollapsed] = useState(false);
+  const [sourceViewerOpen, setSourceViewerOpen] = useState(false);
+  const [selectedSources, setSelectedSources] = useState([]);
+  const [conversationTitle, setConversationTitle] = useState("New Chat");
+  
   const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
 
   useEffect(() => { fetchDocuments(); }, []);
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -54,395 +62,377 @@ export default function Dashboard() {
       setDocuments(docs);
     } catch (err) {
       console.error("Error fetching documents:", err);
-      setError("Failed to load documents");
     }
   };
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    setError("");
-    setSuccess("");
+  // Load conversation messages when switching conversations
+  const loadConversation = async (conversationId) => {
+    if (!conversationId) {
+      setMessages([]);
+      setCurrentConversationId(null);
+      setConversationTitle("New Chat");
+      return;
+    }
+    
     try {
-      await documentsAPI.upload(file, (progress) => setUploadProgress(progress));
-      setSuccess("Document uploaded!");
-      fetchDocuments();
-      setUploadProgress(0);
-      e.target.value = "";
+      const response = await chatAPI.getConversation(conversationId);
+      const { messages: convMessages, title } = response.data;
+      
+      const formattedMessages = convMessages.map(msg => ({
+        role: msg.type === "user" ? "user" : "assistant",
+        content: msg.content,
+        sources: msg.sources || [],
+        timestamp: msg.timestamp,
+        messageId: msg.message_id
+      }));
+      
+      setMessages(formattedMessages);
+      setCurrentConversationId(conversationId);
+      setConversationTitle(title || "Conversation");
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.detail ||
-        (Array.isArray(err.response?.data) ? err.response.data[0]?.msg : null) ||
-        err.message ||
-        "Failed to upload document";
-      setError(errorMessage);
-    } finally {
-      setUploading(false);
+      console.error("Failed to load conversation:", err);
+      setError("Failed to load conversation");
     }
   };
 
-  const handleDeleteDocument = async (fileId) => {
-    if (!window.confirm("Delete this document?")) return;
-    try {
-      await documentsAPI.delete(fileId);
-      setSuccess("Document deleted!");
-      fetchDocuments();
-    } catch (err) {
-      setError(err.response?.data?.detail || "Failed to delete document");
-    }
+  const handleNewConversation = () => {
+    setMessages([]);
+    setCurrentConversationId(null);
+    setConversationTitle("New Chat");
   };
 
   const handleQuerySubmit = async (e) => {
     e.preventDefault();
     if (!question.trim() || loading) return;
-    const userMessage = { role: "user", content: question };
+    
+    const userMessage = { role: "user", content: question, timestamp: new Date().toISOString() };
     setMessages((prev) => [...prev, userMessage]);
     const currentQuestion = question;
     setQuestion("");
     setLoading(true);
     setError("");
+    
     try {
-      const response = await queryAPI.query(currentQuestion);
-      const { answer, sources } = response.data;
+      // Prepare search context based on search mode
+      const searchContext = searchMode !== 'docs_only' ? {
+        enable_web_search: true,
+        search_type: searchMode,
+        max_web_results: 5
+      } : null;
+      
+      const response = await queryAPI.query(currentQuestion, activeFilters, currentConversationId, searchContext);
+      const { answer, sources, conversation_id, is_new_conversation, web_search_used } = response.data;
+      
+      if (is_new_conversation) {
+        setCurrentConversationId(conversation_id);
+        setConversationTitle(currentQuestion.slice(0, 50) + (currentQuestion.length > 50 ? '...' : ''));
+      }
+      
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: answer || "No response received.", sources: sources || [] },
+        { 
+          role: "assistant", 
+          content: answer || "No response received.", 
+          sources: sources || [],
+          timestamp: new Date().toISOString(),
+          webSearchUsed: web_search_used || false
+        },
       ]);
     } catch (err) {
       const errorMsg = err.response?.data?.detail || "Failed to get response.";
       setError(errorMsg);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: `Error: ${errorMsg}`, sources: [] },
+        { role: "assistant", content: `Error: ${errorMsg}`, sources: [], timestamp: new Date().toISOString() },
       ]);
     } finally {
       setLoading(false);
     }
   };
 
-  const toggleSources = (index) => {
-    setExpandedSources((prev) => ({ ...prev, [index]: !prev[index] }));
+  const handleFiltersChange = (filters) => {
+    setActiveFilters(filters);
+  };
+
+  const openSourceViewer = (sources) => {
+    setSelectedSources(sources);
+    setSourceViewerOpen(true);
+  };
+
+  const formatMessageTime = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const accentSurfaceStyle = {
+    background: "color-mix(in srgb, var(--accent-primary) 14%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--accent-primary) 28%, transparent)",
+    color: "var(--accent-primary)",
+  };
+
+  const successSurfaceStyle = {
+    background: "color-mix(in srgb, var(--success) 14%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--success) 28%, transparent)",
+    color: "var(--success)",
+  };
+
+  const dangerSurfaceStyle = {
+    background: "color-mix(in srgb, var(--error) 14%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--error) 28%, transparent)",
+    color: "var(--error)",
+  };
+
+  const gradientButtonStyle = {
+    background: "linear-gradient(135deg, var(--accent-primary), var(--accent-hover))",
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-x-hidden" style={{ background: '#0a0e1a' }}>
-      {/* ═══ Header ═══ */}
-      <header
-        className="flex-shrink-0 flex items-center justify-between px-2 sm:px-5 py-2.5 z-50"
-        style={{
-          background: 'linear-gradient(90deg, #0d1224, #111833)',
-          borderBottom: '1px solid rgba(99, 102, 241, 0.12)',
-        }}
-      >
-        <div className="flex items-center gap-1.5 sm:gap-3">
-          {/* Sidebar Toggle */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 rounded-lg transition-colors lg:hidden"
-            style={{ color: '#94a3b8' }}
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-
+    <div className="h-screen flex flex-col overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      {/* Header */}
+      <header className="z-50 flex flex-shrink-0 items-center justify-between border-b border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-2.5">
+        <div className="flex items-center gap-3">
           <div
-            className="h-7 w-7 sm:h-9 sm:w-9 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #06b6d4)' }}
+            className="h-9 w-9 rounded-lg flex items-center justify-center"
+            style={gradientButtonStyle}
           >
-            <FileText className="h-4 w-4 text-white" />
+            <FileText className="h-5 w-5 text-white" />
           </div>
-          <div className="min-w-0">
-            <h1 className="text-xs sm:text-base font-bold truncate" style={{ color: '#c7d2fe' }}>DocTalk</h1>
-          </div>
+          <h1 className="text-base font-bold text-[var(--text-primary)]">DocTalk</h1>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-4">
-          {/* Stats — hidden on small screens */}
-          <div className="hidden lg:flex items-center gap-5">
-            <div className="flex items-center gap-1.5">
-              <FileText className="h-3.5 w-3.5" style={{ color: '#818cf8' }} />
-              <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>{documents.length} docs</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <MessageSquare className="h-3.5 w-3.5" style={{ color: '#22d3ee' }} />
-              <span className="text-xs font-medium" style={{ color: '#94a3b8' }}>{messages.length} msgs</span>
-            </div>
-          </div>
+        <div className="flex items-center gap-3">
+          <ThemeToggle variant="header" />
+
+          {/* Deep Search Link */}
+          <button
+            onClick={() => navigate('/deep-search')}
+            className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-px"
+            style={{
+              background: "linear-gradient(135deg, var(--accent-primary), var(--accent-hover))",
+              color: "white",
+            }}
+          >
+            <Brain className="h-4 w-4" />
+            <span>Deep Search</span>
+          </button>
+
+          {/* Documents Link */}
+          <button
+            onClick={() => navigate('/documents')}
+            className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-px"
+            style={accentSurfaceStyle}
+          >
+            <FolderOpen className="h-4 w-4" />
+            <span>{documents.length} docs</span>
+          </button>
 
           <button
             onClick={logout}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200"
-            style={{ color: '#f87171', border: '1px solid rgba(248, 113, 113, 0.15)' }}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-px"
+            style={dangerSurfaceStyle}
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <LogOut className="h-4 w-4" />
             <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </header>
 
-      {/* ═══ Main Area ═══ */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* ─── Mobile Overlay Backdrop ─── */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/50 z-30 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
+      {/* Main Area */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Chat History Sidebar */}
+        <ChatHistory
+          currentConversationId={currentConversationId}
+          onSelectConversation={loadConversation}
+          onNewConversation={handleNewConversation}
+          isCollapsed={chatHistoryCollapsed}
+          onToggleCollapse={() => setChatHistoryCollapsed(!chatHistoryCollapsed)}
+        />
 
-        {/* ─── Sidebar (Documents) ─── */}
-        <aside
-          className={`
-            fixed lg:relative top-0 left-0 h-full z-40 lg:z-auto
-            flex flex-col transition-transform duration-300 ease-in-out
-            w-64 sm:w-72 lg:w-64 xl:w-72
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-          `}
-          style={{
-            background: '#0d1224',
-            borderRight: '1px solid rgba(99, 102, 241, 0.1)',
-          }}
-        >
-          {/* Sidebar Header */}
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(99, 102, 241, 0.08)' }}>
-            <div className="flex items-center gap-2">
-              <File className="h-4 w-4" style={{ color: '#818cf8' }} />
-              <span className="text-sm font-semibold" style={{ color: '#c7d2fe' }}>My Documents</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(99, 102, 241, 0.12)', color: '#818cf8' }}
-              >
-                {documents.length}
-              </span>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="lg:hidden p-1 rounded"
-                style={{ color: '#64748b' }}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Upload */}
-          <div className="px-4 py-3">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="w-full py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold text-white transition-all duration-200 disabled:opacity-40"
-              style={{ background: 'linear-gradient(135deg, #6366f1, #06b6d4)' }}
-            >
-              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              <span>{uploading ? "Processing..." : "Upload"}</span>
-            </button>
-            <input ref={fileInputRef} type="file" onChange={handleFileUpload} className="hidden" accept=".pdf,.doc,.docx,.txt" />
-            <p className="text-[10px] text-center mt-1.5" style={{ color: '#475569' }}>PDF, DOC, DOCX, TXT</p>
-          </div>
-
-          {/* Upload Progress */}
-          {uploading && (
-            <div className="mx-4 mb-3 p-3 rounded-lg" style={{ background: 'rgba(99, 102, 241, 0.06)', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
-              <div className="flex justify-between text-[11px] mb-1.5" style={{ color: '#818cf8' }}>
-                <span>Uploading...</span><span>{uploadProgress}%</span>
-              </div>
-              <div className="w-full h-1 rounded-full" style={{ background: '#1e293b' }}>
-                <div className="h-1 rounded-full transition-all" style={{ width: `${uploadProgress}%`, background: 'linear-gradient(90deg, #6366f1, #06b6d4)' }} />
-              </div>
-            </div>
-          )}
-
-          {/* Alerts */}
-          {error && (
-            <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-[11px] flex items-start gap-2" style={{ background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.12)', color: '#fca5a5' }}>
-              <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-              <span className="flex-1 break-words">{error}</span>
-              <button onClick={() => setError("")}><X className="h-3 w-3" /></button>
-            </div>
-          )}
-          {success && (
-            <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-[11px] flex items-start gap-2" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.12)', color: '#6ee7b7' }}>
-              <CheckCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-              <span className="flex-1 break-words">{success}</span>
-              <button onClick={() => setSuccess("")}><X className="h-3 w-3" /></button>
-            </div>
-          )}
-
-          {/* Document List */}
-          <div className="flex-1 overflow-y-auto px-3 pb-3 custom-scrollbar">
-            {documents.length === 0 ? (
-              <div className="text-center py-10">
-                <div className="h-12 w-12 mx-auto mb-3 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99, 102, 241, 0.06)' }}>
-                  <File className="h-5 w-5" style={{ color: '#4f46e5' }} />
-                </div>
-                <p className="text-xs font-medium" style={{ color: '#64748b' }}>No documents yet</p>
-                <p className="text-[10px] mt-0.5" style={{ color: '#334155' }}>Upload a file to get started</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {documents.map((doc) => (
-                  <div
-                    key={doc.file_id}
-                    className="group flex items-center gap-2.5 p-2.5 rounded-lg transition-all duration-200 cursor-default hover:bg-[rgba(99,102,241,0.06)]"
-                    style={{ border: '1px solid transparent' }}
-                  >
-                    <div className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center" style={{ background: 'rgba(99, 102, 241, 0.08)' }}>
-                      <FileText className="h-3.5 w-3.5" style={{ color: '#818cf8' }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate" style={{ color: '#cbd5e1' }}>{doc.filename}</p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <Clock className="h-2.5 w-2.5 flex-shrink-0" style={{ color: '#334155' }} />
-                        <span className="text-[10px]" style={{ color: '#475569' }}>{new Date(doc.uploaded_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteDocument(doc.file_id)}
-                      className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
-                      style={{ color: '#f87171' }}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </aside>
-
-        {/* ─── Chat Area ─── */}
-        <main className="flex-1 flex flex-col overflow-hidden min-w-0" style={{ background: '#080c16' }}>
+        {/* Chat Area */}
+        <main className="min-w-0 flex flex-1 flex-col overflow-hidden bg-[var(--bg-primary)]">
           {/* Chat Header */}
-          <div className="flex-shrink-0 flex items-center gap-2 sm:gap-3 px-3 sm:px-5 py-2" style={{ borderBottom: '1px solid rgba(99, 102, 241, 0.08)' }}>
-            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(6, 182, 212, 0.1)' }}>
-              <Bot className="h-4 w-4" style={{ color: '#22d3ee' }} />
+          <div className="flex flex-shrink-0 items-center gap-3 border-b border-[var(--border-light)] px-4 py-2">
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-lg"
+              style={{ background: "color-mix(in srgb, var(--accent-primary) 14%, transparent)" }}
+            >
+              <Bot className="h-4 w-4 text-[var(--accent-primary)]" />
             </div>
-            <div className="min-w-0">
-              <h2 className="text-xs sm:text-sm font-semibold" style={{ color: '#e2e8f0' }}>AI Assistant</h2>
-              <p className="text-[9px] sm:text-[10px] truncate" style={{ color: '#475569' }}>Ask about your documents</p>
+            <div className="flex-1 min-w-0">
+              <h2 className="truncate text-sm font-semibold text-[var(--text-primary)]">
+                {conversationTitle || 'AI Assistant'}
+              </h2>
+              <p className="text-[10px] text-[var(--text-tertiary)]">
+                {currentConversationId ? `${messages.length} messages` : 'Start a new conversation'}
+              </p>
             </div>
-            {documents.length > 0 && (
-              <div className="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.12)' }}>
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#34d399' }} />
-                <span className="text-[9px] sm:text-[10px] font-medium" style={{ color: '#34d399' }}>Ready</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {currentConversationId && (
+                <button
+                  onClick={handleNewConversation}
+                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition-colors"
+                  style={accentSurfaceStyle}
+                >
+                  <Plus className="h-3 w-3" />
+                  New
+                </button>
+              )}
+              {documents.length > 0 && (
+                <div className="flex items-center gap-1.5 rounded-full px-2 py-0.5" style={successSurfaceStyle}>
+                  <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--success)]" />
+                  <span className="text-[10px] font-medium">Ready</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-3 sm:py-4 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto px-4 py-4 custom-scrollbar">
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-full">
-                <div className="text-center max-w-sm px-4">
+                <div className="text-center max-w-sm">
                   <div
-                    className="h-14 w-14 sm:h-16 sm:w-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
-                    style={{ background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.12)' }}
+                    className="h-16 w-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
+                    style={accentSurfaceStyle}
                   >
-                    <Sparkles className="h-6 w-6 sm:h-7 sm:w-7" style={{ color: '#818cf8' }} />
+                    <Sparkles className="h-7 w-7 text-[var(--accent-primary)]" />
                   </div>
-                  <h3 className="text-base sm:text-lg font-bold mb-1.5" style={{ color: '#e2e8f0' }}>Start a Conversation</h3>
-                  <p className="text-xs sm:text-sm mb-5" style={{ color: '#64748b' }}>
-                    Ask questions about your documents and get AI-powered answers.
+                  <h3 className="mb-2 text-lg font-bold text-[var(--text-primary)]">Start a Conversation</h3>
+                  <p className="mb-5 text-sm text-[var(--text-secondary)]">
+                    {documents.length === 0 
+                      ? "Upload documents first to start asking questions"
+                      : "Ask questions about your documents and get AI-powered answers"}
                   </p>
-                  <div className="space-y-2">
-                    {["Summarize the key findings", "Compare across documents", "What topics are covered?"].map(
-                      (hint, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setQuestion(hint)}
-                          className="w-full text-left px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-[11px] sm:text-xs transition-all duration-200"
-                          style={{ color: '#94a3b8', background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.08)' }}
-                        >
-                          <span style={{ color: '#6366f1', marginRight: '6px' }}>→</span>{hint}
-                        </button>
-                      )
-                    )}
-                  </div>
+                  {documents.length === 0 ? (
+                    <button
+                      onClick={() => navigate('/documents')}
+                      className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+                      style={gradientButtonStyle}
+                    >
+                      <FolderOpen className="h-4 w-4 inline mr-2" />
+                      Go to Documents
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      {["Summarize the key findings", "Compare across documents", "What topics are covered?"].map(
+                        (hint, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setQuestion(hint)}
+                            className="w-full text-left px-4 py-2.5 rounded-lg text-xs transition-all"
+                            style={{
+                              color: "var(--text-secondary)",
+                              background: "color-mix(in srgb, var(--accent-primary) 8%, transparent)",
+                              border: "1px solid color-mix(in srgb, var(--accent-primary) 18%, transparent)",
+                            }}
+                          >
+                            <span className="mr-1.5 text-[var(--accent-primary)]">-&gt;</span>{hint}
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
               <div className="max-w-3xl mx-auto space-y-4">
                 {messages.map((message, index) => (
                   <div key={index} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`flex items-start gap-2 max-w-[92%] sm:max-w-[80%] ${message.role === "user" ? "flex-row-reverse" : ""}`}>
-                      {/* Avatar */}
+                    <div className={`flex items-start gap-2 max-w-[85%] ${message.role === "user" ? "flex-row-reverse" : ""}`}>
                       <div
-                        className="flex-shrink-0 h-6 w-6 sm:h-7 sm:w-7 rounded-lg flex items-center justify-center mt-0.5"
-                        style={{ background: message.role === "user" ? 'rgba(99,102,241,0.12)' : 'rgba(6,182,212,0.1)' }}
+                        className="flex-shrink-0 h-7 w-7 rounded-lg flex items-center justify-center mt-0.5"
+                        style={{
+                          background:
+                            message.role === "user"
+                              ? "color-mix(in srgb, var(--accent-primary) 16%, transparent)"
+                              : "color-mix(in srgb, var(--accent-primary) 10%, transparent)",
+                        }}
                       >
                         {message.role === "user"
-                          ? <User className="h-3 w-3 sm:h-3.5 sm:w-3.5" style={{ color: '#818cf8' }} />
-                          : <Bot className="h-3 w-3 sm:h-3.5 sm:w-3.5" style={{ color: '#22d3ee' }} />
+                          ? <User className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
+                          : <Bot className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
                         }
                       </div>
 
-                      {/* Bubble */}
                       <div className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"} min-w-0`}>
                         <div
-                          className="rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 overflow-hidden"
+                          className="rounded-2xl px-4 py-3 overflow-hidden"
                           style={
                             message.role === "user"
-                              ? { background: 'linear-gradient(135deg, #4f46e5, #4338ca)', color: '#e0e7ff', borderTopRightRadius: '6px' }
-                              : { background: '#111833', border: '1px solid rgba(99,102,241,0.08)', color: '#cbd5e1', borderTopLeftRadius: '6px' }
+                              ? {
+                                  background: "linear-gradient(135deg, var(--accent-primary), var(--accent-hover))",
+                                  color: "#ffffff",
+                                  borderTopRightRadius: "6px",
+                                }
+                              : {
+                                  background: "var(--bg-secondary)",
+                                  border: "1px solid var(--border-light)",
+                                  color: "var(--text-secondary)",
+                                  borderTopLeftRadius: "6px",
+                                }
                           }
                         >
                           {message.role === "assistant" ? (
-                            <div className="markdown-content text-xs sm:text-sm leading-relaxed overflow-x-auto">
+                            <div className="markdown-content text-sm leading-relaxed overflow-x-auto">
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                             </div>
                           ) : (
-                            <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed break-words">{message.content}</p>
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed break-words">{message.content}</p>
                           )}
                         </div>
 
-                        {/* Sources */}
+                        {/* Sources with web indicator */}
                         {message.sources && message.sources.length > 0 && (
-                          <div className="mt-1.5">
-                            <button onClick={() => toggleSources(index)} className="flex items-center gap-1 text-[10px] sm:text-[11px]" style={{ color: '#64748b' }}>
-                              <FileText className="h-3 w-3" />
-                              <span>{message.sources.length} source{message.sources.length > 1 ? 's' : ''}</span>
-                              <ChevronDown className={`h-3 w-3 transition-transform ${expandedSources[index] ? 'rotate-180' : ''}`} />
-                            </button>
-                            {expandedSources[index] && (
-                              <div className="mt-1 flex flex-wrap gap-1">
-                                {message.sources.map((source, idx) => (
-                                  <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] sm:text-[10px]" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.1)', color: '#94a3b8' }}>
-                                    <FileText className="h-2.5 w-2.5 mr-1 flex-shrink-0" style={{ color: '#6366f1' }} />
-                                    <span className="truncate max-w-[120px] sm:max-w-none">
-                                      {typeof source === "object" ? `${source.filename || "Unknown"}${source.page ? ` · p${source.page}` : ""}` : source}
-                                    </span>
-                                  </span>
-                                ))}
-                              </div>
+                          <button 
+                            onClick={() => openSourceViewer(message.sources)} 
+                            className="mt-1.5 flex items-center gap-1.5 rounded-lg border border-[var(--border-light)] px-2.5 py-1 text-[11px] text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-hover)]"
+                          >
+                            {message.webSearchUsed ? (
+                              <Globe className="h-3 w-3 text-[var(--warning)]" />
+                            ) : (
+                              <FileText className="h-3 w-3 text-[var(--accent-primary)]" />
                             )}
-                          </div>
+                            <span>
+                              {message.sources.length} source{message.sources.length > 1 ? 's' : ''}
+                              {message.webSearchUsed && ' (incl. web)'}
+                            </span>
+                            <ChevronDown className="h-3 w-3" />
+                          </button>
                         )}
 
-                        <span className="text-[9px] sm:text-[10px] mt-1 px-1" style={{ color: '#334155' }}>
-                          {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        <span className="mt-1 px-1 text-[10px] text-[var(--text-tertiary)]">
+                          {formatMessageTime(message.timestamp)}
                         </span>
                       </div>
                     </div>
                   </div>
                 ))}
 
-                {/* Typing */}
+                {/* Loading */}
                 {loading && (
                   <div className="flex justify-start">
                     <div className="flex items-start gap-2">
-                      <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(6,182,212,0.1)' }}>
-                        <Bot className="h-3 w-3 sm:h-3.5 sm:w-3.5" style={{ color: '#22d3ee' }} />
+                      <div
+                        className="flex h-7 w-7 items-center justify-center rounded-lg"
+                        style={{ background: "color-mix(in srgb, var(--accent-primary) 10%, transparent)" }}
+                      >
+                        <Bot className="h-3.5 w-3.5 text-[var(--accent-primary)]" />
                       </div>
-                      <div className="rounded-2xl rounded-tl-md px-3 sm:px-4 py-2.5 sm:py-3" style={{ background: '#111833', border: '1px solid rgba(99,102,241,0.08)' }}>
+                      <div
+                        className="rounded-2xl rounded-tl-md border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-3"
+                      >
                         <div className="flex items-center gap-2">
                           <div className="flex gap-1">
                             {[0, 1, 2].map((i) => (
-                              <div key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: '#6366f1', animation: `pulse-dot 1.4s ease-in-out ${i * 0.2}s infinite` }} />
+                              <div
+                                key={i}
+                                className="h-1.5 w-1.5 rounded-full bg-[var(--accent-primary)]"
+                                style={{ animation: `pulse-dot 1.4s ease-in-out ${i * 0.2}s infinite` }}
+                              />
                             ))}
                           </div>
-                          <span className="text-[10px] sm:text-[11px]" style={{ color: '#64748b' }}>Analyzing...</span>
+                          <span className="text-[11px] text-[var(--text-tertiary)]">Analyzing...</span>
                         </div>
                       </div>
                     </div>
@@ -454,45 +444,86 @@ export default function Dashboard() {
           </div>
 
           {/* Input Bar */}
-          <div className="flex-shrink-0 px-3 sm:px-5 py-2.5 sm:py-3" style={{ borderTop: '1px solid rgba(99,102,241,0.08)' }}>
-            <form onSubmit={handleQuerySubmit} className="max-w-3xl mx-auto flex gap-2 sm:gap-3">
-              <div className="flex-1 relative min-w-0">
-                <input
-                  type="text"
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  placeholder={documents.length === 0 ? "Upload a document first..." : "Ask about your documents..."}
-                  disabled={loading || documents.length === 0}
-                  className="w-full px-3 sm:px-4 py-2.5 pr-8 rounded-xl text-xs sm:text-sm disabled:opacity-30 transition-all duration-200 focus:outline-none"
-                  style={{ background: '#0d1224', border: '1px solid rgba(99,102,241,0.1)', color: '#e2e8f0' }}
-                  onFocus={(e) => { e.target.style.borderColor = 'rgba(99,102,241,0.3)'; e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.08)'; }}
-                  onBlur={(e) => { e.target.style.borderColor = 'rgba(99,102,241,0.1)'; e.target.style.boxShadow = 'none'; }}
-                />
-                {question.length > 0 && (
-                  <button type="button" onClick={() => setQuestion("")} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: '#475569' }}>
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !question.trim() || documents.length === 0}
-                className="px-3 sm:px-5 py-2.5 rounded-xl flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold text-white transition-all duration-200 disabled:opacity-25 flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #6366f1, #06b6d4)' }}
+          <div className="relative z-10 flex-shrink-0 border-t border-[var(--border-light)] px-4 py-3">
+            {error && (
+              <div
+                className="mx-auto mb-2 flex max-w-3xl items-center gap-2 rounded-lg px-3 py-2 text-xs"
+                style={{
+                  background: "color-mix(in srgb, var(--error) 14%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--error) 28%, transparent)",
+                  color: "var(--error)",
+                }}
               >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                <span className="hidden sm:inline">Send</span>
-              </button>
-            </form>
-            {documents.length === 0 && (
-              <p className="text-center text-[10px] sm:text-[11px] mt-1.5 flex items-center justify-center gap-1" style={{ color: '#334155' }}>
-                <AlertCircle className="h-3 w-3" />
-                <span>Upload documents to start chatting</span>
-              </p>
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span className="flex-1">{error}</span>
+                <button onClick={() => setError("")}><X className="h-3 w-3" /></button>
+              </div>
             )}
+            
+            <form onSubmit={handleQuerySubmit} className="max-w-3xl mx-auto">
+              <div className="relative z-10 mb-2 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <FilterPanel 
+                    documents={documents} 
+                    onFiltersChange={handleFiltersChange}
+                    activeFilters={activeFilters}
+                  />
+                  {activeFilters && (
+                    <div className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs" style={accentSurfaceStyle}>
+                      <FilterIcon className="h-3.5 w-3.5" />
+                      <span>Filters active</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center justify-end">
+                  <SearchMode 
+                    searchMode={searchMode}
+                    onModeChange={setSearchMode}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1 relative min-w-0">
+                  <input
+                    type="text"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    placeholder={documents.length === 0 ? "Upload documents first..." : "Ask about your documents..."}
+                    disabled={loading || documents.length === 0}
+                    className="w-full rounded-xl border border-[var(--border-light)] bg-[var(--bg-secondary)] px-4 py-2.5 pr-8 text-sm text-[var(--text-primary)] transition-all placeholder:text-[var(--text-placeholder)] focus:outline-none focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--accent-primary)_30%,transparent)] disabled:opacity-30"
+                  />
+                  {question.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setQuestion("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading || !question.trim() || documents.length === 0}
+                  className="px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold text-white transition-all disabled:opacity-25"
+                  style={gradientButtonStyle}
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  <span className="hidden sm:inline">Send</span>
+                </button>
+              </div>
+            </form>
           </div>
         </main>
       </div>
+
+      {/* Source Viewer Modal */}
+      <SourceViewer
+        sources={selectedSources}
+        isOpen={sourceViewerOpen}
+        onClose={() => setSourceViewerOpen(false)}
+      />
     </div>
   );
 }
