@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+import os
 
 from middleware.cors import add_cors_middleware
 from middleware.logging import logging_middleware
@@ -44,8 +45,11 @@ app.include_router(perplexica_router)
 def health():
     return {"status": "ok"}
 
-# this is the api flow for reindexing 
+# this is the api flow for reindexing
 # delete_document(user_id, file_id)
 # delete_chunks_by_file(user_id, file_id)
 # rebuild_user_index(user_id)
 
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))
+    app.run(host="0.0.0.0", port=port)
