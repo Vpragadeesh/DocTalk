@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import logging
 
-from auth.dependencies import get_current_user_id
+from authentication.dependencies import get_current_user_id
 from storage.chat_storage import chat_storage
 
 logger = logging.getLogger(__name__)

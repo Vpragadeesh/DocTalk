@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 import time
 
-from auth.dependencies import get_current_user_id
+from authentication.dependencies import get_current_user_id
 from config.perplexica import (
     FocusMode, get_perplexica_config, FOCUS_MODE_INFO
 )

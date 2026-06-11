@@ -5,7 +5,7 @@ import shutil
 import uuid
 
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
-from auth.dependencies import get_current_user_id
+from authentication.dependencies import get_current_user_id
 
 from db.mongo import (
     insert_document,

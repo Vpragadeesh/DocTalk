@@ -10,7 +10,7 @@ import logging
 from rag.memory_chain import get_conversational_rag_chain
 from rag.streaming_chain import get_streaming_rag_chain, stream_rag_response
 from db.mongo import save_chat, get_chat_history
-from auth.dependencies import get_current_user_id
+from authentication.dependencies import get_current_user_id
 from storage.chat_storage import chat_storage
 
 logger = logging.getLogger(__name__)

@@ -38,7 +38,6 @@ export default function Landing() {
             }}
           >
             <Sparkles className="h-3 w-3 text-[var(--accent-primary)] sm:h-3.5 sm:w-3.5" />
-            <span className="text-[10px] font-medium text-[var(--accent-primary)] sm:text-xs">Powered by Google Gemini AI</span>
           </div>
 
           <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-4 sm:mb-6">

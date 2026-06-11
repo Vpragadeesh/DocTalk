@@ -2,9 +2,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from db.mongo import users_col
-from auth.auth_utils import hash_password, verify_password
-from auth.jwt_handler import create_access_token
-from auth.dependencies import get_current_user
+from authentication.auth_utils import hash_password, verify_password
+from authentication.jwt_handler import create_access_token
+from authentication.dependencies import get_current_user
 from storage.session_manager import cleanup_user_session
 import uuid
 
@@ -44,9 +44,9 @@ def login(data: LoginRequest):
 
 @router.post("/demo")
 def demo_login():
-    """Login with a temporary demo account (auto-created if not exists)"""
-    demo_email = "demo@doctalk.app"
-    demo_password = "Demo@12345"
+    """Login with demo account (demo@mail.com / demopassword)"""
+    demo_email = "demo@mail.com"
+    demo_password = "demopassword"
 
     user = users_col.find_one({"email": demo_email})
     if not user:

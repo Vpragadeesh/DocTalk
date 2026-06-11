@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from rag.memory_chain import get_conversational_rag_chain
-from auth.dependencies import get_current_user_id
+from authentication.dependencies import get_current_user_id
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 

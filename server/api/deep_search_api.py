@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 import time
 
-from auth.dependencies import get_current_user_id
+from authentication.dependencies import get_current_user_id
 from rag.deep_search import (
     DeepSearchEngine, DeepSearchConfig, SearchDepth,
     get_deep_search_engine, deep_search
