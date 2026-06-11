@@ -1,6 +1,4 @@
 from fastapi import FastAPI
-import os
-
 from middleware.cors import add_cors_middleware
 from middleware.logging import logging_middleware
 from middleware.timing import timing_middleware
@@ -49,7 +47,9 @@ def health():
 # delete_document(user_id, file_id)
 # delete_chunks_by_file(user_id, file_id)
 # rebuild_user_index(user_id)
-
 if __name__ == "__main__":
+    import uvicorn
+    import os
+
     port = int(os.getenv("PORT", 8000))
-    app.run(host="0.0.0.0", port=port)
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
